@@ -87,6 +87,21 @@ Identity bytes: `[creatorProfileId (32 bytes)][min_tier_level (8 bytes, BCS u64)
 | `GET /api/creators` | List creator profiles (from indexer) |
 | `GET /api/creator/:id` | Get creator profile + content |
 
+## Roadmap Features (Post-MVP)
+
+These are documented in detail in `docs/SCOPE.md` Section 13. The MVP scope remains unchanged — these are future phases.
+
+| Feature | Key Move Patterns | Phase |
+|---------|-------------------|-------|
+| Creator Registry | DF + String→ID Mapping | 2 |
+| One-Time Tips & Platform Fees | PTB coin splitting, platform treasury | 2 |
+| Subscription Tiers | Clock + Table (DF), time-based expiry | 2 |
+| Pay-per-Post | Modified Escrow, per-blob DF access | 3 |
+| Individual Requests | Hot Potato (`RequestReceipt`), Escrow + timeout | 3 |
+| Enhanced Content Encryption | Sui Seal + nonce-based ephemeral keys | 3 |
+| Community NFTs | OTW + Display<T>, tier-gated minting | 4 |
+| Crowdfunding | Shared Object + CampaignCap + Contributor Table (DF) | 4 |
+
 ## Environment Variables
 
 Public vars go in `frontend/.env`, secrets in `frontend/.env.local` (gitignored):

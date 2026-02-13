@@ -339,6 +339,7 @@ No Clock needed in MVP since AccessPass has no expiry.
 
 For hackathon judging, the contract showcases these patterns:
 
+**MVP (Phase 1):**
 1. **One-Time Witness (OTW)** — `SUIPATRON` struct in `init` for guaranteed single initialization
 2. **Capability Pattern** — `AdminCap` for platform admin, `CreatorCap` for per-creator authorization
 3. **Shared Objects** — `Platform` and `CreatorProfile` for concurrent read/write access
@@ -346,7 +347,15 @@ For hackathon judging, the contract showcases these patterns:
 5. **Enums** — `ContentType` enum (if beneficial) or at minimum enum-like tier structures
 6. **Events** — Full event emission for off-chain indexing
 7. **Version Tracking** — `version` field on `Platform` and `CreatorProfile` with migration function
-8. **Hot Potato** (stretch) — If time allows, add `PurchaseReceipt` hot potato to the purchase flow
+
+**Roadmap (Post-MVP):**
+8. **Hot Potato** — `RequestReceipt` for Individual Requests (must be consumed in same tx) *(Phase 3)*
+9. **Dynamic Fields (DF)** — Creator Registry `String → ID` mapping, Contributor Tables *(Phase 2/4)*
+10. **Clock + Time-based Logic** — Subscription expiry, campaign deadlines, request timeouts *(Phase 2/3/4)*
+11. **Table** — Subscriber tracking `address → timestamp`, contributor tracking `address → amount` *(Phase 2/4)*
+12. **PTB Coin Splitting** — Tips + platform fee in a single transaction *(Phase 2)*
+13. **Escrow** — Payment held until creator fulfills request or deadline passes *(Phase 3)*
+14. **Display<T>** — Community NFT metadata rendering *(Phase 4)*
 
 ### 4.7 Error Codes
 
@@ -1072,25 +1081,159 @@ const events = await client.queryEvents({
 
 ## 13. Future Phases
 
-These features are **out of scope for MVP** but documented here for post-hackathon development and to show judges we've thought about the roadmap.
+These features are **out of scope for MVP** but documented here for post-hackathon development and to show judges we've thought about the roadmap. Each feature includes the Move patterns it demonstrates.
 
-### Phase 2: Monetization & Engagement
+### Quick Feature Reference
 
-| Feature | Description |
-|---|---|
-| **Tips** | One-time voluntary payments to creators (no tier required). Simple `tip(profile, coin)` function. |
-| **Platform fees** | Platform takes a small cut (e.g., 2.5%) on every transaction. Configurable via AdminCap. |
-| **Time-based subscriptions** | Monthly/yearly plans with `expires_at` on AccessPass. Requires Clock validation in `seal_approve`. |
+| Feature | Move Patterns | Phase |
+|---|---|---|
+| Creator Registry | Dynamic Fields (DF) + String Mapping | 2 |
+| One-Time Tips & Platform Fees | PTB coin splitting + Platform Treasury | 2 |
+| Subscription Tiers | Sui::Clock + Table (DF) + Internal Logic | 2 |
+| Pay-per-Post | Modified Escrow + DF per-blob access | 3 |
+| Individual Requests | Hot Potato Pattern + Escrow | 3 |
+| Enhanced Content Encryption | Sui Seal + Nonce-based Ephemeral Keys | 3 |
+| Community NFTs | One-Time Witness (OTW) + Enoki/Sui Stack | 4 |
+| Crowdfunding | Shared Object + CampaignCap + Contributor Table (DF) | 4 |
 
-### Phase 3: Community & Collaboration
+### Phase 2: Monetization & Creator Tools
 
-| Feature | Description |
-|---|---|
-| **Crowdfunding content ideas** | Supporters propose + fund content ideas. Creator delivers → funds released. Escrow pattern. |
-| **Individual requests** | 1:1 paid requests from supporter to creator. Private messaging with payment. |
-| **Creator collaborations** | Multi-creator content with revenue splitting. |
+#### One-Time Tips & Platform Fees (PTBs)
 
-### Phase 4: Rich Content & Scale
+Instead of complex escrow for a simple tip, we use Programmable Transaction Blocks (PTBs). In a single transaction, the PTB splits the fan's `Coin<SUI>`, sending the majority to the creator and a small percentage to the platform treasury. This ensures a seamless user experience with only one signature required.
+
+**Move patterns:** PTB coin splitting, platform treasury `Balance<SUI>`, `AdminCap`-configurable fee BPS.
+
+**Entry functions:**
+- `tip(profile, coin, ctx)` — split coin, deposit creator share, platform share
+- `set_platform_fee(platform, admin_cap, fee_bps)` — admin sets fee (e.g., 250 = 2.5%)
+
+#### Creator Registry (DF + String Mapping)
+
+To allow fans to find creators by name or handle, a shared `Registry` object uses Dynamic Fields. It stores a lightweight mapping of `String` (the handle) to `ID` (the CreatorProfile). Since these mappings don't need to exist as standalone objects, DFs keep the storage costs low and the lookups fast.
+
+**Move patterns:** Shared object, Dynamic Fields (not Dynamic Object Fields), `String → ID` mapping.
+
+**Entry functions:**
+- `register_handle(registry, profile, cap, handle, ctx)` — claim a unique handle
+- `lookup_handle(registry, handle)` — resolve handle to CreatorProfile ID
+
+#### Subscription Tiers (Clock + Table DF)
+
+Tiers are managed using the `Sui::Clock` module to track time-based expiry. A `Table` (implemented via Dynamic Fields) inside the Tier object maps `address → timestamp_ms`. Every time a user tries to access content, the contract checks if the current time is less than their stored expiry.
+
+**Move patterns:** `Clock` for on-chain time, `Table<address, u64>` for subscriber tracking, expiry validation in `seal_approve`.
+
+**Changes to existing types:**
+- `AccessPass` gains `expires_at: u64` field
+- `seal_approve` adds Clock parameter: reject if `clock.timestamp_ms() > access_pass.expires_at`
+- New `renew_subscription(profile, access_pass, payment, clock, ctx)` function
+
+### Phase 3: Advanced Content & Requests
+
+#### Pay-per-Post (Modified Escrow)
+
+This leverages the existing escrow model but applies it to a single content object. When a user pays for a single post, a Dynamic Field is added to their profile granting them specific access to that Walrus Blob ID without requiring a full monthly subscription.
+
+**Move patterns:** Dynamic Fields on user's `AccessPass` or a new `PostAccess` object, per-blob-ID gating.
+
+**Entry functions:**
+- `purchase_post(profile, content_id, payment, ctx)` — pay for single content item, mint `PostAccess`
+- Updated `seal_approve` checks for either tier-level `AccessPass` OR specific `PostAccess` for the content
+
+#### Individual Requests (Hot Potato + Escrow)
+
+For custom requests (like a personal shoutout), we use the Hot Potato pattern to ensure completion. A user's payment creates a `RequestReceipt` with no abilities (`has no drop, store, or key`), meaning the transaction must finish with the creator either fulfilling it or the system refunding it after a timeout. This protects the fan's money from being stuck if a creator is inactive.
+
+**Move patterns:** Hot Potato (`RequestReceipt` — no `drop`, `store`, or `key` ability), escrow with timeout, `Clock` for deadline.
+
+**Types:**
+```
+RequestReceipt (hot potato — no abilities)
+├── creator_profile_id: ID
+├── requester: address
+├── amount: u64
+├── description: String
+├── deadline: u64              # Clock timestamp for timeout/refund
+
+Request (shared object — escrow)
+├── id: UID
+├── receipt: Option<RequestReceipt>  # Consumed on fulfill or refund
+├── payment: Balance<SUI>
+├── status: u8                 # 0=pending, 1=fulfilled, 2=refunded
+```
+
+**Entry functions:**
+- `create_request(profile, payment, description, deadline, clock, ctx)` → returns `RequestReceipt`
+- `fulfill_request(request, receipt, blob_id, cap, ctx)` — creator delivers, consumes receipt
+- `refund_request(request, receipt, clock, ctx)` — auto-refund after deadline, consumes receipt
+
+#### Enhanced Content Encryption (Sui Seal + Nonce-based Ephemeral Keys)
+
+To prevent unauthorized link sharing, we use Sui Seal to store content keys. The contract generates a unique Nonce (seed) for authorized users, which, when combined with the "sealed" master key on the frontend, allows the user to decrypt the Walrus blob locally. This makes shared keys useless for anyone who didn't trigger the on-chain access check.
+
+**Move patterns:** On-chain nonce generation, per-user ephemeral key derivation, enhanced `seal_approve` with nonce tracking.
+
+**Changes to existing types:**
+- `seal_approve` generates and stores a user-specific nonce via DF on `AccessPass`
+- Frontend combines nonce + sealed master key for decryption
+- Prevents key reuse across users even if key shares are intercepted
+
+### Phase 4: Community & Crowdfunding
+
+#### Community NFTs (OTW + Enoki)
+
+To give creators their own "Brand," we use the One-Time Witness (OTW) pattern to initialize a unique NFT collection for their community. Leveraging the existing Enoki setup, creators can upload media that gets minted as membership NFTs for users who reach specific payment tiers.
+
+**Move patterns:** One-Time Witness for collection uniqueness, `Display<T>` for NFT metadata, tier-gated minting.
+
+**Types:**
+```
+CommunityNFT
+├── id: UID
+├── creator_profile_id: ID
+├── name: String
+├── image_url: String          # Walrus blob (public, not encrypted)
+├── tier_level: u64            # Tier at which this was earned
+├── edition: u64               # Edition number
+```
+
+**Entry functions:**
+- `create_collection(profile, cap, name, image_blob_id, max_supply, ctx)` — creator defines collection
+- `mint_community_nft(profile, collection, access_pass, ctx)` — auto-mint to qualifying supporters
+
+#### Crowdfunding Content (Shared Object + CampaignCap + Contributor Table DF)
+
+A creator can launch a campaign using a Shared Object to collect funds from multiple "Early Investors." A `CampaignCap` ensures only the creator can withdraw once the goal is hit. A DF `Table` tracks contributors so they receive automatic "free" access or discounts once the content is released.
+
+**Move patterns:** Shared object for concurrent contributions, capability pattern (`CampaignCap`), `Table<address, u64>` for contributor tracking, goal-based release logic.
+
+**Types:**
+```
+Campaign (shared object)
+├── id: UID
+├── creator_profile_id: ID
+├── title: String
+├── description: String
+├── goal: u64                  # Target amount in MIST
+├── raised: Balance<SUI>
+├── deadline: u64              # Clock timestamp
+├── status: u8                 # 0=active, 1=funded, 2=failed
+├── contributors: Table<address, u64>  # address → amount contributed
+
+CampaignCap (owned by creator)
+├── id: UID
+├── campaign_id: ID
+```
+
+**Entry functions:**
+- `create_campaign(profile, cap, title, desc, goal, deadline, clock, ctx)` — launch campaign
+- `contribute(campaign, payment, clock, ctx)` — fan contributes, tracked in table
+- `finalize_campaign(campaign, campaign_cap, clock, ctx)` — creator withdraws if goal met
+- `refund_campaign(campaign, clock, ctx)` — contributors reclaim if deadline passed + goal not met
+- `grant_contributor_access(campaign, campaign_cap, contributor, ctx)` — mint AccessPass to contributors
+
+### Phase 5: Rich Content & Scale
 
 | Feature | Description |
 |---|---|
@@ -1100,6 +1243,7 @@ These features are **out of scope for MVP** but documented here for post-hackath
 | **Creator analytics** | Revenue charts, supporter demographics, content engagement metrics. |
 | **Mobile app** | React Native or PWA for mobile-first experience. |
 | **Multi-chain** | Bridge to other chains for cross-chain subscriptions. |
+| **Creator collaborations** | Multi-creator content with revenue splitting. |
 
 ---
 
