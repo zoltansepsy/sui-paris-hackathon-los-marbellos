@@ -118,6 +118,21 @@ VITE_WALRUS_NETWORK=testnet
 ENOKI_SECRET_KEY=...           # .env.local only
 ```
 
+## Implementation Status & Developer Handover
+
+The central tracking document for what has been implemented and what remains is:
+**`docs/IMPLEMENTATION_STATUS.md`**
+
+This is the single source of truth for developer handover. When completing any task (smart contract, frontend, backend, integration):
+1. Update the relevant section in `docs/IMPLEMENTATION_STATUS.md`
+2. Move completed items from "Remaining" to "Completed"
+3. Add any technical notes or gotchas discovered during implementation
+4. Keep the "Contract API Quick Reference" section up to date if entry functions change
+
+Other key documents:
+- `docs/SCOPE.md` — Full project specification, architecture, task breakdown
+- `docs/SMART_CONTRACT_IMPLEMENTATION_PLAN.md` — Detailed contract implementation guide
+
 ## Deployment
 
 - **Frontend:** Vercel (auto-deploy from main), framework preset: Vite
