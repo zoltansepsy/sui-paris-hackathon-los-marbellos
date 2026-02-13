@@ -43,7 +43,7 @@ SuiPatron is a decentralized Patreon-like platform where creators publish exclus
 | Keep ~100% of earnings (no 30% platform cut) | One-click access with Google sign-in |
 | Content cannot be deplatformed | On-chain proof of support (NFT) |
 | Human-readable identity (SuiNS) | Transparent, verifiable payments |
-| Full control over tiers and pricing | Content access guaranteed by cryptography, not trust |
+| Full control over pricing | Content access guaranteed by cryptography, not trust |
 
 ---
 
@@ -53,33 +53,33 @@ The MVP is what we ship for the hackathon. Everything below this line is in scop
 
 ### 2.1 MVP Feature Set
 
-#### Core Model: One-Time Payment Access
+#### Core Model: Flat One-Time Payment Access
 
-The MVP uses a **one-time payment model** — not recurring subscriptions. A supporter pays once per creator (at a chosen tier level) and gets permanent access to all content at or below that tier.
+The MVP uses a **flat one-time payment model** — not recurring subscriptions and not tiered. A supporter pays a single price set by the creator and gets permanent access to **all** of that creator's content.
 
-This simplifies the contract (no expiry logic, no renewal flow) while still demonstrating the full technical stack.
+This simplifies the contract (no expiry logic, no renewal flow, no tier comparisons) while still demonstrating the full technical stack. Multiple tiers are planned for a future phase.
 
 #### Feature Checklist
 
 | # | Feature | Priority |
 |---|---------|----------|
 | F1 | **Google sign-in (zkLogin via Enoki)** — gasless, no wallet needed | P0 |
-| F2 | **Creator profile creation** — name, bio, avatar, tiers | P0 |
-| F3 | **Tier definition** — creators define 1–3 tiers with name, price (SUI), description | P0 |
-| F4 | **One-time payment + Access NFT minting** — supporter pays SUI, receives `AccessPass` NFT | P0 |
-| F5 | **Content upload (encrypted)** — creator uploads file → SEAL encrypts → Walrus stores | P0 |
-| F6 | **Content access (decrypted)** — supporter with valid AccessPass → SEAL decrypts → content renders | P0 |
-| F7 | **SEAL access policy** — on-chain `seal_approve` validates AccessPass tier ≥ content tier | P0 |
-| F8 | **SuiNS subname registration** — creator gets `name@suipatron.sui` | P1 |
-| F9 | **Creator dashboard** — view earnings, manage content, see supporters | P0 |
-| F10 | **Supporter feed** — browse creators, view purchased content | P0 |
-| F11 | **On-chain events** — emit events for all key actions | P0 |
-| F12 | **Event indexer** — listen to on-chain events, build queryable state | P1 |
-| F13 | **Earnings withdrawal** — creator withdraws accumulated SUI balance | P0 |
-| F14 | **Explore/discovery page** — browse all creators | P0 |
+| F2 | **Creator profile creation** — name, bio, avatar, access price | P0 |
+| F3 | **One-time payment + Access NFT minting** — supporter pays creator's price in SUI, receives `AccessPass` NFT | P0 |
+| F4 | **Content upload (encrypted)** — creator uploads file → SEAL encrypts → Walrus stores | P0 |
+| F5 | **Content access (decrypted)** — supporter with valid AccessPass → SEAL decrypts → content renders | P0 |
+| F6 | **SEAL access policy** — on-chain `seal_approve` validates AccessPass belongs to correct creator | P0 |
+| F7 | **SuiNS subname registration** — creator gets `name@suipatron.sui` | P1 |
+| F8 | **Creator dashboard** — view earnings, manage content, see supporters | P0 |
+| F9 | **Supporter feed** — browse creators, view purchased content | P0 |
+| F10 | **On-chain events** — emit events for all key actions | P0 |
+| F11 | **Event indexer** — listen to on-chain events, build queryable state | P1 |
+| F12 | **Earnings withdrawal** — creator withdraws accumulated SUI balance | P0 |
+| F13 | **Explore/discovery page** — browse all creators | P0 |
 
 #### What's Explicitly OUT of MVP
 
+- **Multiple tiers** (single flat price in MVP; tiers planned for Phase 2)
 - Recurring subscriptions / time-based plans
 - Tips / donations
 - Platform fees (we take 0% in MVP)
@@ -97,8 +97,7 @@ User clicks "Sign in with Google"
   → Enoki zkLogin creates SUI address from Google JWT
   → User lands on empty dashboard
   → User clicks "Create Creator Profile"
-  → Fills: name, bio, avatar (optional)
-  → Defines tiers (e.g., "Bronze: 1 SUI", "Silver: 5 SUI", "Gold: 10 SUI")
+  → Fills: name, bio, avatar (optional), access price (in SUI)
   → Submits → sponsored transaction creates CreatorProfile on-chain
   → (Optional) System registers SuiNS subname: name@suipatron.sui
   → Creator is redirected to their dashboard
@@ -109,10 +108,10 @@ User clicks "Sign in with Google"
 ```
 Creator navigates to Dashboard → "Upload Content"
   → Selects file (image, PDF, text)
-  → Sets title, description, minimum tier level
-  → Frontend encrypts file with SEAL (identity = creatorProfileId + minTierLevel)
+  → Sets title, description
+  → Frontend encrypts file with SEAL (identity = creatorProfileId)
   → Encrypted blob uploaded to Walrus → returns blobId
-  → Sponsored transaction publishes Content metadata on-chain (blobId, tier, title)
+  → Sponsored transaction publishes Content metadata on-chain (blobId, title)
   → Content appears in creator's content grid
 ```
 
@@ -120,22 +119,22 @@ Creator navigates to Dashboard → "Upload Content"
 
 ```
 Supporter browses Explore page → clicks on a creator
-  → Sees creator profile: bio, tiers, content count
-  → Clicks "Support" on desired tier (e.g., "Silver: 5 SUI")
-  → Confirmation modal shows price and what they unlock
+  → Sees creator profile: bio, price, content count
+  → Clicks "Support" button (shows creator's price, e.g., "5 SUI")
+  → Confirmation modal shows price and what they unlock (all content)
   → Sponsored transaction:
       1. Takes payment (SUI coin)
       2. Mints AccessPass NFT to supporter
       3. Deposits SUI into creator's balance
-  → Supporter sees "Access Granted" and content unlocks
+  → Supporter sees "Access Granted" and all content unlocks
 ```
 
 #### Flow 4: Content Access (Supporter)
 
 ```
 Supporter navigates to creator's page or their own feed
-  → Sees content cards (title, description, tier badge)
-  → Clicks on a content card they have access to
+  → Sees content cards (title, description, type badge)
+  → Clicks on a content card
   → Frontend downloads encrypted blob from Walrus
   → Frontend calls SEAL decrypt:
       - Builds PTB calling seal_approve with supporter's AccessPass NFT
@@ -217,11 +216,11 @@ The architecture supports any file type (video, audio, archives) — we just nee
 
 | Decision | Why |
 |---|---|
-| **One-time payment (not subscription)** | Simpler MVP. No expiry/renewal logic. Still demonstrates full SEAL + payment flow. |
-| **`AccessPass` instead of `SubscriptionNFT`** | Naming reflects the one-time model. Same underlying pattern — owned NFT with tier level. |
+| **One-time flat payment (not subscription, not tiered)** | Simplest possible MVP. No expiry/renewal logic, no tier comparisons. Still demonstrates full SEAL + payment flow. |
+| **`AccessPass` instead of `SubscriptionNFT`** | Naming reflects the one-time model. Owned NFT proving payment to a specific creator. |
 | **`CreatorProfile` as shared object** | Multiple users need to read it (supporters browsing). Creator needs to mutate it (upload content, withdraw). |
-| **Content as dynamic object fields** | Unbounded content per creator. Each content item has its own UID for SEAL identity construction. |
-| **SEAL identity = creatorProfileId + minTierLevel** | Allows per-tier encryption. A Gold supporter can decrypt Silver content because their tier level ≥ required tier. |
+| **Content as dynamic object fields** | Unbounded content per creator. Each content item has its own UID. |
+| **SEAL identity = creatorProfileId only** | Flat model — all content for a creator is encrypted with the same identity. Any valid AccessPass unlocks everything. Per-tier encryption deferred to Phase 2. |
 | **Enoki sponsors everything** | Zero-friction UX. Supporters don't need SUI for gas. Only the actual payment requires SUI tokens. |
 | **Events for all state changes** | Enables off-chain indexing. Frontend can query indexed data instead of on-chain reads for lists/feeds. |
 
@@ -263,7 +262,7 @@ CreatorProfile (shared object)
 ├── bio: String
 ├── avatar_blob_id: Option<String>  # Walrus blob ID for avatar
 ├── suins_name: Option<String>      # e.g. "alice@suipatron"
-├── tiers: vector<Tier>             # Ordered tier definitions
+├── price: u64                      # Access price in MIST (1 SUI = 1_000_000_000 MIST)
 ├── content_count: u64
 ├── total_supporters: u64
 ├── balance: Balance<SUI>           # Accumulated earnings
@@ -274,15 +273,8 @@ CreatorProfile (shared object)
 │       ├── title: String
 │       ├── description: String
 │       ├── blob_id: String         # Walrus blob ID (encrypted)
-│       ├── min_tier_level: u64     # Minimum tier to decrypt
 │       ├── created_at: u64
 │       └── content_type: String    # "image", "text", "pdf"
-
-Tier (store, copy, drop — value type in vector)
-├── name: String
-├── price: u64                      # In MIST (1 SUI = 1_000_000_000 MIST)
-├── description: String
-└── tier_level: u64                 # 1 = basic, 2 = premium, 3 = VIP
 
 CreatorCap (owned object → creator)
 ├── id: UID
@@ -291,7 +283,6 @@ CreatorCap (owned object → creator)
 AccessPass (owned object → supporter)
 ├── id: UID
 ├── creator_profile_id: ID
-├── tier_level: u64
 ├── purchased_at: u64               # Epoch timestamp
 ├── amount_paid: u64
 └── supporter: address
@@ -301,11 +292,10 @@ AccessPass (owned object → supporter)
 
 | Function | Caller | Parameters | Effects |
 |---|---|---|---|
-| `create_profile` | Anyone (via Enoki) | `platform, name, bio, tiers, ctx` | Creates `CreatorProfile` (shared) + `CreatorCap` (owned). Emits `ProfileCreated`. |
-| `update_profile` | Creator (with `CreatorCap`) | `profile, cap, name, bio, avatar_blob_id` | Updates profile metadata. Emits `ProfileUpdated`. |
-| `add_tier` | Creator (with `CreatorCap`) | `profile, cap, name, price, description, tier_level` | Appends tier to `profile.tiers`. |
-| `publish_content` | Creator (with `CreatorCap`) | `profile, cap, title, desc, blob_id, min_tier_level, content_type, clock, ctx` | Creates `Content` as dynamic object field. Emits `ContentPublished`. |
-| `purchase_access` | Supporter | `platform, profile, tier_index, payment: Coin<SUI>, clock, ctx` | Validates payment ≥ tier price. Deposits SUI into `profile.balance`. Mints `AccessPass` to sender. Emits `AccessPurchased`. |
+| `create_profile` | Anyone (via Enoki) | `platform, name, bio, price, ctx` | Creates `CreatorProfile` (shared) + `CreatorCap` (owned). Emits `ProfileCreated`. |
+| `update_profile` | Creator (with `CreatorCap`) | `profile, cap, name, bio, avatar_blob_id, price` | Updates profile metadata. Emits `ProfileUpdated`. |
+| `publish_content` | Creator (with `CreatorCap`) | `profile, cap, title, desc, blob_id, content_type, clock, ctx` | Creates `Content` as dynamic object field. Emits `ContentPublished`. |
+| `purchase_access` | Supporter | `platform, profile, payment: Coin<SUI>, clock, ctx` | Validates payment ≥ profile price. Deposits SUI into `profile.balance`. Mints `AccessPass` to sender. Emits `AccessPurchased`. |
 | `withdraw_earnings` | Creator (with `CreatorCap`) | `profile, cap, ctx` | Transfers full `profile.balance` to creator. Emits `EarningsWithdrawn`. |
 | `migrate` | Admin (with `AdminCap`) | `platform, cap` | Updates version after package upgrade. |
 
@@ -317,22 +307,21 @@ module suipatron::seal_policy
     seal_approve(id: vector<u8>, access_pass: &AccessPass, ctx: &TxContext)
 
     Validation steps:
-    1. Parse `id` → extract creator_profile_id (32 bytes) + min_tier_level (8 bytes, BCS)
+    1. Parse `id` → extract creator_profile_id (32 bytes)
     2. Verify access_pass.supporter == ctx.sender()
     3. Verify access_pass.creator_profile_id matches parsed creator_profile_id
-    4. Verify access_pass.tier_level >= parsed min_tier_level
 ```
 
-No Clock needed in MVP since AccessPass has no expiry.
+No Clock needed in MVP since AccessPass has no expiry. No tier comparison needed — flat access means any valid AccessPass for the creator unlocks all content.
 
 ### 4.5 Events
 
 | Event | Fields | When Emitted |
 |---|---|---|
-| `ProfileCreated` | `profile_id, owner, name, timestamp` | `create_profile` |
+| `ProfileCreated` | `profile_id, owner, name, price, timestamp` | `create_profile` |
 | `ProfileUpdated` | `profile_id, name, timestamp` | `update_profile` |
-| `ContentPublished` | `content_id, profile_id, blob_id, min_tier_level, content_type, timestamp` | `publish_content` |
-| `AccessPurchased` | `access_pass_id, profile_id, supporter, tier_level, amount, timestamp` | `purchase_access` |
+| `ContentPublished` | `content_id, profile_id, blob_id, content_type, timestamp` | `publish_content` |
+| `AccessPurchased` | `access_pass_id, profile_id, supporter, amount, timestamp` | `purchase_access` |
 | `EarningsWithdrawn` | `profile_id, amount, recipient, timestamp` | `withdraw_earnings` |
 
 ### 4.6 Move Patterns Demonstrated
@@ -344,7 +333,7 @@ For hackathon judging, the contract showcases these patterns:
 2. **Capability Pattern** — `AdminCap` for platform admin, `CreatorCap` for per-creator authorization
 3. **Shared Objects** — `Platform` and `CreatorProfile` for concurrent read/write access
 4. **Dynamic Object Fields** — `Content` items stored on `CreatorProfile` for unbounded content
-5. **Enums** — `ContentType` enum (if beneficial) or at minimum enum-like tier structures
+5. **Enums** — `ContentType` enum (if beneficial)
 6. **Events** — Full event emission for off-chain indexing
 7. **Version Tracking** — `version` field on `Platform` and `CreatorProfile` with migration function
 
@@ -363,13 +352,11 @@ For hackathon judging, the contract showcases these patterns:
 const ENotOTW: u64 = 0;
 const EUnauthorized: u64 = 1;
 const EInsufficientPayment: u64 = 2;
-const EInvalidTierIndex: u64 = 3;
-const EVersionMismatch: u64 = 4;
-const EAlreadyMigrated: u64 = 5;
-const ENotSubscriber: u64 = 6;
-const EWrongCreator: u64 = 7;
-const EInsufficientTier: u64 = 8;
-const EZeroBalance: u64 = 9;
+const EVersionMismatch: u64 = 3;
+const EAlreadyMigrated: u64 = 4;
+const ENotSubscriber: u64 = 5;
+const EWrongCreator: u64 = 6;
+const EZeroBalance: u64 = 7;
 ```
 
 ---
@@ -385,8 +372,8 @@ const EZeroBalance: u64 = 9;
 | `/` | Landing | Hero, value prop, "Sign in with Google" CTA |
 | `/auth/callback` | Auth Callback | Handles Enoki zkLogin redirect, sets session |
 | `/explore` | Explore | Grid of creator cards, search/filter |
-| `/creator/:id` | Creator Profile | Public profile: bio, tiers, content preview, "Support" buttons |
-| `/dashboard` | Creator Dashboard | Manage profile, tiers, content, view earnings, withdraw |
+| `/creator/:id` | Creator Profile | Public profile: bio, price, content preview, "Support" button |
+| `/dashboard` | Creator Dashboard | Manage profile, price, content, view earnings, withdraw |
 | `/feed` | Supporter Feed | Content feed from supported creators |
 | `/settings` | Settings | Profile edit, SuiNS name, account info |
 
@@ -406,24 +393,22 @@ App
 ├── Explore Page
 │   ├── SearchBar
 │   ├── CreatorGrid
-│   │   └── CreatorCard (avatar, name, SuiNS, tier count, supporter count)
+│   │   └── CreatorCard (avatar, name, SuiNS, price, supporter count)
 │   └── Pagination / Infinite Scroll
 │
 ├── Creator Profile Page
-│   ├── CreatorHeader (avatar, name, SuiNS badge, bio)
-│   ├── TierSelector
-│   │   └── TierCard (name, price, description, "Support" button)
+│   ├── CreatorHeader (avatar, name, SuiNS badge, bio, price)
+│   ├── SupportButton (shows price, triggers purchase)
 │   ├── ContentGrid
-│   │   └── ContentCard (title, type badge, tier badge, lock/unlock icon)
-│   └── SubscribeModal (confirm payment, tier details)
+│   │   └── ContentCard (title, type badge, lock/unlock icon)
+│   └── ConfirmModal (confirm payment, price details)
 │
 ├── Creator Dashboard
-│   ├── ProfileEditor (name, bio, avatar upload)
-│   ├── TierManager (add/edit tiers)
-│   ├── ContentUploader (file picker, title, description, tier selector)
+│   ├── ProfileEditor (name, bio, avatar upload, price setting)
+│   ├── ContentUploader (file picker, title, description)
 │   ├── ContentList (published content with metadata)
 │   ├── EarningsPanel (balance display, "Withdraw" button)
-│   └── SupporterList (who purchased, which tier)
+│   └── SupporterList (who purchased)
 │
 ├── Supporter Feed
 │   ├── SubscriptionList (active access passes)
@@ -435,7 +420,7 @@ App
     ├── Card (base card with variants)
     ├── Modal (overlay with confirmation)
     ├── Toast (success, error, info notifications)
-    ├── Badge (tier level, content type)
+    ├── Badge (content type, access status)
     ├── Avatar (with fallback)
     ├── LoadingSpinner
     ├── EmptyState (illustration + CTA)
@@ -500,7 +485,6 @@ The backend holds the Enoki private API key and sponsors transactions on behalf 
 - `{PACKAGE_ID}::suipatron::publish_content`
 - `{PACKAGE_ID}::suipatron::purchase_access`
 - `{PACKAGE_ID}::suipatron::withdraw_earnings`
-- `{PACKAGE_ID}::suipatron::add_tier`
 
 ---
 
@@ -511,8 +495,8 @@ The backend holds the Enoki private API key and sponsors transactions on behalf 
 **How SEAL works in SuiPatron:**
 
 1. **Encryption (content upload):**
-   - Creator selects file and minimum tier level
-   - Frontend constructs SEAL identity: `[creatorProfileId_bytes (32)][bcs_encoded_minTierLevel (8)]`
+   - Creator selects file
+   - Frontend constructs SEAL identity: `[creatorProfileId_bytes (32)]`
    - Frontend calls `sealClient.encrypt({ threshold: 2, packageId, id, data })`
    - Encrypted output is a self-contained blob (includes metadata for decryption)
 
@@ -523,12 +507,13 @@ The backend holds the Enoki private API key and sponsors transactions on behalf 
    - SEAL key servers execute the PTB to validate access, return key shares if approved
    - Client reconstructs decryption key and decrypts content locally
 
-**SEAL Identity Format:**
+**SEAL Identity Format (MVP — flat access):**
 ```
 Bytes: [0..32] = CreatorProfile object ID (as bytes)
-       [32..40] = BCS-encoded u64 min_tier_level
-Total: 40 bytes
+Total: 32 bytes
 ```
+
+In the flat model, all content for a creator shares the same SEAL identity (the creator's profile ID). Any valid AccessPass for that creator can decrypt all content. Per-tier encryption is planned for Phase 2 when multiple tiers are introduced.
 
 **Critical Notes:**
 - The `packageId` passed to `sealClient.encrypt()` must be the hex-encoded package ID WITHOUT the `0x` prefix (check SDK docs for exact format)
@@ -624,7 +609,7 @@ const address = await suiClient.resolveNameServiceAddress({ name: 'alice@suipatr
 | ID | Task | Depends On | Deliverable | Phase |
 |---|---|---|---|---|
 | A1 | Write Move package: Platform, AdminCap, init | — | Compiling `suipatron.move` | 1 |
-| A2 | Write: CreatorProfile, Tier, create_profile, add_tier | A1 | Functions + unit tests | 1 |
+| A2 | Write: CreatorProfile, create_profile (flat price) | A1 | Functions + unit tests | 1 |
 | A3 | Write: AccessPass, purchase_access | A2 | Payment + minting logic | 1 |
 | A4 | Write: Content, publish_content (dynamic object fields) | A2 | Content storage logic | 1 |
 | A5 | Write: withdraw_earnings | A2 | Withdrawal logic | 1 |
@@ -664,9 +649,9 @@ const address = await suiClient.resolveNameServiceAddress({ name: 'alice@suipatr
 | J2 | Layout: Header, navigation, responsive shell | J1 | App shell | 1 |
 | J3 | Landing page: hero, features, CTA | J1, J2 | `/` route | 1 |
 | J4 | Explore page: creator grid | J1 | `/explore` route (mock data initially) | 1 |
-| J5 | Creator Profile page: header, tiers, content grid | J1 | `/creator/:id` route | 2 |
-| J6 | Subscribe modal: tier confirmation, payment UI | J5 | Modal component | 2 |
-| J7 | Creator Dashboard: profile editor, tier manager | J1 | `/dashboard` route | 2 |
+| J5 | Creator Profile page: header, price, content grid | J1 | `/creator/:id` route | 2 |
+| J6 | Support modal: payment confirmation UI | J5 | Modal component | 2 |
+| J7 | Creator Dashboard: profile editor, price setting | J1 | `/dashboard` route | 2 |
 | J8 | Content uploader: file picker, metadata form | J7 | Upload UI component | 2 |
 | J9 | Content viewer: image, text, PDF renderers | J5 | Decrypted content display | 3 |
 | J10 | Supporter feed: subscriptions list, content feed | J1 | `/feed` route | 3 |
@@ -685,7 +670,7 @@ const address = await suiClient.resolveNameServiceAddress({ name: 'alice@suipatr
 | Z5 | SuiNS domain registration (testnet) | — | Own `suipatron.sui` | 1 |
 | Z6 | Integration testing: sign in → create profile → upload | Phase 2 | Test report | 3 |
 | Z7 | Integration testing: browse → subscribe → decrypt | Phase 3 | Test report | 3 |
-| Z8 | Seed demo data (3 creators, 2-3 tiers each, 5+ content items) | Phase 3 | Demo-ready state | 4 |
+| Z8 | Seed demo data (3 creators, realistic prices, 5+ content items) | Phase 3 | Demo-ready state | 4 |
 | Z9 | Demo script writing | Phase 3 | 3-minute pitch script | 4 |
 | Z10 | Bug bash + final fixes | Phase 3 | Release candidate | 4 |
 
@@ -703,7 +688,7 @@ Hour 0-1:  Scaffold repo + deploy to Vercel
            Start design system components
            Set up Enoki portal + Google OAuth
 
-Hour 1-2:  Write CreatorProfile, Tier, create_profile
+Hour 1-2:  Write CreatorProfile, create_profile (flat price)
            Implement zkLogin sign-in + callback
            Build layout shell (Header, nav)
            Configure environment, SuiNS registration
@@ -728,7 +713,7 @@ Hour 2-4:  Write AccessPass, purchase_access, Content, publish_content
 Hour 4-6:  Write seal_policy, events, unit tests
            Deploy package to Testnet → share Package ID
            Build PTB builders (create_profile, purchase_access)
-           Build Creator Profile page + Subscribe modal
+           Build Creator Profile page + Support modal
 
 Hour 6-8:  Set up backend sponsor endpoint
            Integrate SEAL encryption + Walrus upload
@@ -781,7 +766,7 @@ Hour 14-16: Add SuiNS creation to profile flow
 **Goal:** Demo-ready product. Seed data. Presentation prepared.
 
 ```
-Hour 16-18: Seed demo data (creators, content, tiers)
+Hour 16-18: Seed demo data (creators, content, prices)
             Final UI polish (responsive, animations, micro-interactions)
             Optimize SEAL session caching, Walrus download speed
             Verify all events, fix edge cases
@@ -794,7 +779,7 @@ Hour 18-20: Write demo script, practice presentation
 
 **Phase 4 Gate (SHIP IT):**
 - [ ] Demo script tested and timed (≤ 3 minutes)
-- [ ] Seeded with 3+ creators, 2-3 tiers each, 5+ content items
+- [ ] Seeded with 3+ creators, realistic prices, 5+ content items
 - [ ] Full flow works without errors on demo path
 - [ ] Backup: screen recording of successful flow
 
@@ -850,7 +835,6 @@ suipatron/
 │       │   ├── ui/
 │       │   ├── layout/
 │       │   ├── creator/
-│       │   ├── subscription/
 │       │   └── content/
 │       ├── pages/
 │       │   ├── Landing.tsx
@@ -994,11 +978,10 @@ Every state-changing action emits a Move event. These events are the source of t
 
 | Event Type | Emitted By | Key Fields |
 |---|---|---|
-| `ProfileCreated` | `create_profile` | profile_id, owner, name |
+| `ProfileCreated` | `create_profile` | profile_id, owner, name, price |
 | `ProfileUpdated` | `update_profile` | profile_id, name |
-| `TierAdded` | `add_tier` | profile_id, tier_level, price |
-| `ContentPublished` | `publish_content` | content_id, profile_id, blob_id, min_tier_level, content_type |
-| `AccessPurchased` | `purchase_access` | access_pass_id, profile_id, supporter, tier_level, amount |
+| `ContentPublished` | `publish_content` | content_id, profile_id, blob_id, content_type |
+| `AccessPurchased` | `purchase_access` | access_pass_id, profile_id, supporter, amount |
 | `EarningsWithdrawn` | `withdraw_earnings` | profile_id, amount, recipient |
 
 ### 12.2 Indexer Architecture
@@ -1022,7 +1005,7 @@ interface IndexedCreator {
   bio: string;
   avatarBlobId?: string;
   suinsName?: string;
-  tiers: { name: string; price: number; description: string; tierLevel: number }[];
+  price: number;                // Access price in MIST
   contentCount: number;
   totalSupporters: number;
   createdAt: number;
@@ -1034,7 +1017,6 @@ interface IndexedContent {
   title: string;
   description: string;
   blobId: string;
-  minTierLevel: number;
   contentType: string;
   createdAt: number;
 }
@@ -1043,7 +1025,6 @@ interface IndexedAccessPurchase {
   accessPassId: string;
   creatorProfileId: string;
   supporter: string;
-  tierLevel: number;
   amount: number;
   timestamp: number;
 }
@@ -1087,6 +1068,7 @@ These features are **out of scope for MVP** but documented here for post-hackath
 
 | Feature | Move Patterns | Phase |
 |---|---|---|
+| Multiple Tiers | Tier struct vector, per-tier SEAL identity, tier-gated access | 2 |
 | Creator Registry | Dynamic Fields (DF) + String Mapping | 2 |
 | One-Time Tips & Platform Fees | PTB coin splitting + Platform Treasury | 2 |
 | Subscription Tiers | Sui::Clock + Table (DF) + Internal Logic | 2 |
@@ -1097,6 +1079,23 @@ These features are **out of scope for MVP** but documented here for post-hackath
 | Crowdfunding | Shared Object + CampaignCap + Contributor Table (DF) | 4 |
 
 ### Phase 2: Monetization & Creator Tools
+
+#### Multiple Tiers (Tier Vector + Per-Tier SEAL)
+
+The MVP uses a flat single-price model. This phase adds multiple tiers (e.g., "Bronze: 1 SUI", "Silver: 5 SUI", "Gold: 10 SUI"), allowing creators to gate content at different access levels. A higher-tier AccessPass can decrypt lower-tier content.
+
+**Move patterns:** `Tier` struct (`store, copy, drop`), `vector<Tier>` on CreatorProfile, tier-level gating in `seal_approve`, SEAL identity extended to `[creatorProfileId (32 bytes)][minTierLevel (8 bytes, BCS u64)]`.
+
+**Changes to existing types:**
+- `CreatorProfile` gains `tiers: vector<Tier>` field (replaces `price: u64`)
+- `Content` gains `min_tier_level: u64` field
+- `AccessPass` gains `tier_level: u64` field
+- `seal_approve` adds tier-level comparison: `access_pass.tier_level >= parsed min_tier_level`
+- SEAL identity becomes 40 bytes (32 + 8) instead of 32
+
+**New entry functions:**
+- `add_tier(profile, cap, name, price, description, tier_level)` — append tier to `profile.tiers`
+- `purchase_access` updated to accept `tier_index` parameter
 
 #### One-Time Tips & Platform Fees (PTBs)
 
@@ -1259,14 +1258,14 @@ CampaignCap (owned by creator)
 
 **[0:30 – 1:00] Demo: Creator Signs In & Sets Up**
 - Click "Sign in with Google" — Enoki zkLogin, no wallet
-- Create profile: name, bio, tiers (show the UI)
+- Create profile: name, bio, access price (show the UI)
 - Show SuiNS name created: `demo@suipatron.sui`
 - Upload a piece of encrypted content (show SEAL + Walrus in action)
 
 **[1:00 – 1:45] Demo: Supporter Discovers & Purchases**
 - Switch to a different Google account (or use incognito)
 - Browse Explore page → find the creator
-- Click on creator → see tiers and locked content
+- Click on creator → see price and locked content
 - Click "Support" → confirm payment → gasless transaction (Enoki sponsored)
 - Show AccessPass NFT minted on-chain (SUI explorer link)
 
@@ -1288,7 +1287,7 @@ CampaignCap (owned by creator)
 
 ```
 [ ] 3 pre-seeded creator profiles with diverse content
-[ ] Each creator has 2-3 tiers with realistic pricing
+[ ] Each creator has a realistic access price
 [ ] 5+ content items across creators (mix of images, text, PDF)
 [ ] 1 "fresh" supporter account ready for live demo
 [ ] Test the full flow 3+ times before demo
@@ -1362,7 +1361,7 @@ CampaignCap (owned by creator)
 | **Blob** | A data object stored on Walrus, identified by its blob ID |
 | **SEAL Identity** | A byte array encoding the access policy parameters for encryption/decryption |
 | **zkLogin** | Zero-knowledge login — proves Google account ownership without revealing JWT to the chain |
-| **AccessPass** | An NFT proving a supporter paid for a specific tier of a specific creator |
+| **AccessPass** | An NFT proving a supporter paid for access to a specific creator's content |
 | **Shared Object** | A SUI object that can be accessed by multiple transactions concurrently |
 | **Dynamic Object Field** | Key-value storage attached to an object, for unbounded data |
 | **OTW** | One-Time Witness — ensures code runs exactly once at package publish |

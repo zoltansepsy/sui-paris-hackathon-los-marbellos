@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SuiPatron is a decentralized Patreon-like creator support platform on SUI. Creators publish encrypted content, supporters pay once per tier for permanent access. Content is encrypted with SEAL and stored on Walrus. All access control is on-chain via AccessPass NFTs. Transactions are sponsored via Enoki zkLogin (Google sign-in, no wallet needed).
+SuiPatron is a decentralized Patreon-like creator support platform on SUI. Creators publish encrypted content, supporters pay a flat one-time price for permanent access to all of a creator's content. Content is encrypted with SEAL and stored on Walrus. All access control is on-chain via AccessPass NFTs. Transactions are sponsored via Enoki zkLogin (Google sign-in, no wallet needed). Multiple tiers are planned for Phase 2 — the MVP uses a single price per creator.
 
 The full specification lives in `docs/SCOPE.md`.
 
@@ -41,8 +41,8 @@ cd frontend && npm run build   # production build
 ### Smart Contract Layer (`move/suipatron/sources/`)
 
 Two modules:
-- **suipatron.move** — Core: Platform (singleton shared object), CreatorProfile (shared object with dynamic Content fields), AccessPass (owned NFT), Tiers, payments, withdrawal
-- **seal_policy.move** — SEAL access control: `seal_approve` validates AccessPass tier >= content's min_tier_level
+- **suipatron.move** — Core: Platform (singleton shared object), CreatorProfile (shared object with flat price + dynamic Content fields), AccessPass (owned NFT), payments, withdrawal
+- **seal_policy.move** — SEAL access control: `seal_approve` validates AccessPass belongs to correct creator
 
 Key Move patterns used:
 - One-Time Witness (OTW) in `init` for singleton Platform + AdminCap
@@ -58,13 +58,13 @@ Key Move patterns used:
 | Sign in | Frontend → Google OAuth → Enoki → zkLogin address |
 | Create profile | Frontend PTB → Enoki sponsors → SUI executes → CreatorProfile + CreatorCap created |
 | Upload content | File → SEAL encrypt (client-side) → Walrus store → blobId recorded on-chain as Content dynamic field |
-| Purchase access | Frontend PTB with payment → Enoki sponsors → SUI deposits to profile balance + mints AccessPass NFT |
+| Purchase access | Frontend PTB with flat payment → Enoki sponsors → SUI deposits to profile balance + mints AccessPass NFT |
 | View content | Walrus download → SEAL decrypt (seal_approve validates AccessPass) → render |
 | Withdraw | Frontend PTB → Enoki sponsors → balance transferred to creator |
 
 ### SEAL Encryption Identity Format
 
-Identity bytes: `[creatorProfileId (32 bytes)][min_tier_level (8 bytes, BCS u64)]`. This enables per-tier encryption — a higher-tier AccessPass can decrypt lower-tier content.
+Identity bytes: `[creatorProfileId (32 bytes)]`. In the flat MVP model, all content for a creator shares the same SEAL identity. Any valid AccessPass for that creator unlocks all content. Per-tier encryption (40-byte identity with tier level) is planned for Phase 2.
 
 ### Frontend Pages
 
@@ -73,7 +73,7 @@ Identity bytes: `[creatorProfileId (32 bytes)][min_tier_level (8 bytes, BCS u64)
 | `/` | Landing page with Google sign-in CTA |
 | `/auth/callback` | Enoki zkLogin redirect handler |
 | `/explore` | Creator discovery grid |
-| `/creator/:id` | Public creator profile + tiers + content |
+| `/creator/:id` | Public creator profile + price + content |
 | `/dashboard` | Creator management (content, earnings, withdraw) |
 | `/feed` | Supporter's content feed |
 
@@ -93,6 +93,7 @@ These are documented in detail in `docs/SCOPE.md` Section 13. The MVP scope rema
 
 | Feature | Key Move Patterns | Phase |
 |---------|-------------------|-------|
+| Multiple Tiers | Tier struct vector, per-tier SEAL identity, tier-gated access | 2 |
 | Creator Registry | DF + String→ID Mapping | 2 |
 | One-Time Tips & Platform Fees | PTB coin splitting, platform treasury | 2 |
 | Subscription Tiers | Clock + Table (DF), time-based expiry | 2 |
