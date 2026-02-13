@@ -1,0 +1,16 @@
+[package]
+name = "suipatron"
+version = "0.0.1"
+edition = "2024.beta"
+
+[addresses]
+suipatron = "0x0"
+
+[environments]
+localnet = "b1df7722"
+testnet = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[dev-dependencies]

@@ -1,0 +1,15 @@
+# Run lint-staged
+pnpm lint-staged
+
+# Run type check
+pnpm type-check
+
+# Run architecture pattern checks
+# If this fails, fix the violations before committing. Do not use --no-verify.
+pnpm run check:patterns || {
+  echo ""
+  echo "❌ Pattern checks failed! Fix violations before committing."
+  echo "   Run 'pnpm check:patterns' manually to see details."
+  echo "   See docs/PRE-COMMIT-CHECKS.md for guidelines."
+  exit 1
+}
