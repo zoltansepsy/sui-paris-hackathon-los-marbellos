@@ -157,6 +157,64 @@ export class WalrusService {
   }
 
   /**
+   * NEW: Upload file and return BOTH blob ID and certify transaction (unbundled).
+   *
+   * This allows the caller to merge the certify TX with other operations
+   * (like publish_content) into a single PTB, reducing signatures from 3 → 2.
+   *
+   * Flow: register → upload → return (blobId, certifyTx)
+   * Caller must execute certifyTx (optionally merged with other operations).
+   */
+  async uploadFileReturnCertifyTx(
+    data: Uint8Array,
+    signAndExecute: (tx: {
+      transaction: any;
+      options?: Record<string, unknown>;
+    }) => Promise<{ digest: string }>,
+    ownerAddress: string,
+  ): Promise<{ blobId: string; certifyTx: any }> {
+    const client = this.ensureClient();
+
+    const flow = client.writeBlobFlow({ blob: data });
+
+    // Step 1: Encode the blob
+    await flow.encode();
+
+    // Step 2: Build registration transaction
+    const registerTx = flow.register({
+      epochs: WALRUS_DEFAULT_EPOCHS,
+      deletable: false,
+      owner: ownerAddress,
+    });
+
+    // Set transaction sender (required for signing)
+    registerTx.setSender(ownerAddress);
+
+    // Step 3: Sign and execute the registration transaction (SIGNATURE 1)
+    const registerResult = await signAndExecute({
+      transaction: registerTx,
+    });
+
+    // Step 4: Wait for network sync
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+    // Step 5: Upload slivers (off-chain, no signature)
+    await flow.upload({ digest: registerResult.digest });
+
+    // Step 6: Build certification transaction (but DON'T execute it yet)
+    const certifyTx = flow.certify();
+
+    // Step 7: Get the blob info
+    const result = await flow.getBlob();
+
+    // Return both blobId and certify transaction (caller will merge with publish_content)
+    return {
+      blobId: result.blobId,
+      certifyTx,
+    };
+  }
+
+  /**
    * Download a blob by ID.
    *
    * Tries the aggregator HTTP endpoint first (faster), falls back to SDK.

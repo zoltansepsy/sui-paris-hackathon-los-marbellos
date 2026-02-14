@@ -22,6 +22,7 @@ export interface CreatorsPageResult {
 
 export interface Creator {
   id: string;
+  owner: string; // SUI address of creator (for SuiNS resolution)
   name: string;
   email: string;
   avatar: string;

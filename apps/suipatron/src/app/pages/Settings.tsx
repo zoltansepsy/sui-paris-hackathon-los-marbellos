@@ -63,7 +63,7 @@ export function Settings() {
     setIsSaving(false);
     setShowSuiNSModal(false);
     setSuinsInput("");
-    toast.success("SuiNS name claimed successfully!");
+    toast.success("Display name set successfully!");
   };
 
   const handleSignOut = () => {
@@ -133,12 +133,12 @@ export function Settings() {
             </CardContent>
           </Card>
 
-          {/* SuiNS */}
+          {/* Display Name */}
           <Card>
             <CardHeader>
-              <CardTitle>SuiNS Identity</CardTitle>
+              <CardTitle>Display Name & SuiNS</CardTitle>
               <CardDescription>
-                Your human-readable blockchain identity
+                Your display name and SuiNS identity (if registered)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -146,7 +146,7 @@ export function Settings() {
                 <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">
-                      Your SuiNS name
+                      Your display name
                     </p>
                     <Badge variant="secondary" className="text-base">
                       {user.suinsName}
@@ -156,15 +156,36 @@ export function Settings() {
               ) : (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    You haven&apos;t claimed your SuiNS name yet. Get a
-                    human-readable identity like{" "}
-                    <span className="font-mono">yourname@suipatron.sui</span>
+                    Set a display name for your profile
                   </p>
                   <Button onClick={() => setShowSuiNSModal(true)}>
-                    Claim SuiNS Name
+                    Set Display Name
                   </Button>
                 </div>
               )}
+
+              {/* SuiNS Auto-Resolution Info */}
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
+                <div className="space-y-2">
+                  <div className="flex items-start space-x-2">
+                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                      <p className="font-semibold mb-1">SuiNS Auto-Detection ✨</p>
+                      <p className="text-xs">If you own a real SuiNS name (e.g., alice.sui), it will automatically appear on your profile!</p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://suins.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-700 dark:text-blue-300 hover:underline inline-flex items-center"
+                  >
+                    Register a SuiNS name →
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -200,18 +221,18 @@ export function Settings() {
         </div>
       </section>
 
-      {/* SuiNS Modal */}
+      {/* Display Name Modal */}
       <Dialog open={showSuiNSModal} onOpenChange={setShowSuiNSModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Claim Your SuiNS Name</DialogTitle>
+            <DialogTitle>Set Your Display Name</DialogTitle>
             <DialogDescription>
-              Get a human-readable identity for your profile
+              Choose a display name for your profile
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="suins">Choose your name</Label>
+              <Label htmlFor="suins">Choose your display name</Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id="suins"
@@ -228,8 +249,21 @@ export function Settings() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                This will be your unique identity on SuiPatron
+                Note: This is a display name only, not a registered SuiNS name
               </p>
+            </div>
+
+            {/* SuiNS Info */}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+              <div className="flex items-start space-x-2">
+                <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-xs text-blue-900 dark:text-blue-100">
+                  <p className="font-semibold mb-1">Want a real SuiNS name?</p>
+                  <p>Register at <a href="https://suins.io" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-700">suins.io</a> and it will automatically appear on your profile!</p>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -243,10 +277,10 @@ export function Settings() {
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Claiming...
+                  Setting...
                 </>
               ) : (
-                "Claim Name"
+                "Set Display Name"
               )}
             </Button>
           </DialogFooter>

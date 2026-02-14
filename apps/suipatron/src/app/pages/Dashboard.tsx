@@ -9,7 +9,11 @@ import {
   useContentList,
 } from "../hooks/useCreator";
 import { useSuiPatronTransactions } from "../hooks/useTransactions";
-import { useContentUpload, useContentUploadUnencrypted } from "../hooks/useContent";
+import {
+  useContentUpload,
+  useContentUploadUnencrypted,
+  useContentUploadBundled,
+} from "../hooks/useContent";
 import { onchainContentToContent } from "../lib/adapters";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { MIST_PER_SUI } from "../constants";
@@ -61,11 +65,11 @@ export function Dashboard() {
     withdrawEarnings,
     isPending: txPending,
   } = useSuiPatronTransactions();
-  // Using unencrypted upload for creator's own content preview
+  // Using BUNDLED upload for better UX (2 signatures instead of 3)
+  // Bundles Walrus certify + publish_content into a single PTB
   // SEAL encryption works but creators can't decrypt their own content without AccessPass
-  // For demo: use encrypted upload for one piece to show SEAL working via console logs
   const { upload: uploadContent, isPending: uploadPending } =
-    useContentUploadUnencrypted();
+    useContentUploadBundled();
 
   // Form states
   const [name, setName] = useState(myProfile?.name || user?.name || "");
@@ -167,7 +171,7 @@ export function Dashboard() {
     setIsSaving(false);
     setShowSuiNSModal(false);
     setSuinsInput("");
-    toast.success("SuiNS name claimed successfully!");
+    toast.success("Display name set successfully!");
   };
 
   const handleContentUpload = async () => {
@@ -424,7 +428,7 @@ export function Dashboard() {
                     size="sm"
                     onClick={() => setShowSuiNSModal(true)}
                   >
-                    Claim SuiNS Name
+                    Set Display Name
                   </Button>
                 )}
               </div>
@@ -664,18 +668,18 @@ export function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* SuiNS Modal */}
+      {/* Display Name Modal */}
       <Dialog open={showSuiNSModal} onOpenChange={setShowSuiNSModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Claim Your SuiNS Name</DialogTitle>
+            <DialogTitle>Set Your Display Name</DialogTitle>
             <DialogDescription>
-              Get a human-readable identity for your creator profile
+              Choose a display name for your creator profile
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="suins">Choose your name</Label>
+              <Label htmlFor="suins">Choose your display name</Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id="suins"
@@ -692,8 +696,21 @@ export function Dashboard() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                This will be your unique identity on SuiPatron
+                Note: This is a display name only, not a registered SuiNS name
               </p>
+            </div>
+
+            {/* SuiNS Auto-Resolution Info */}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+              <div className="flex items-start space-x-2">
+                <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-xs text-blue-900 dark:text-blue-100">
+                  <p className="font-semibold mb-1">Have a real SuiNS name?</p>
+                  <p>If you own a SuiNS name (e.g., alice.sui), it will automatically appear on your profile! Register at <a href="https://suins.io" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-700">suins.io</a></p>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -707,10 +724,10 @@ export function Dashboard() {
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Claiming...
+                  Setting...
                 </>
               ) : (
-                "Claim Name"
+                "Set Display Name"
               )}
             </Button>
           </DialogFooter>

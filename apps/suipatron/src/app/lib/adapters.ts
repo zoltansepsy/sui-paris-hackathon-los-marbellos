@@ -14,6 +14,7 @@ import { MIST_PER_SUI, WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 export function creatorProfileToCreator(profile: CreatorProfile): Creator {
   return {
     id: profile.objectId,
+    owner: profile.owner, // Preserve owner address for SuiNS resolution
     name: profile.name,
     email: "",
     avatar: profile.avatarBlobId

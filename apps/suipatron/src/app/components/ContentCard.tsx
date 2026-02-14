@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Lock, Image as ImageIcon, FileText, FileType, Loader2 } from "lucide-react";
+import { Lock, Image as ImageIcon, FileText, BookOpen, Loader2 } from "lucide-react";
 import type { Content } from "@/shared/types/creator.types";
 import { useWalrusDownload } from "../hooks/useContent";
 
@@ -14,68 +14,21 @@ interface ContentCardProps {
   blobId?: string; // Walrus blob ID for fetching content
 }
 
-async function renderPdfFirstPage(bytes: Uint8Array): Promise<string> {
-  try {
-    // Dynamically import PDF.js only on client side
-    const pdfjsLib = await import("pdfjs-dist");
-
-    // Configure worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-
-    const loadingTask = pdfjsLib.getDocument({ data: bytes });
-    const pdf = await loadingTask.promise;
-    const page = await pdf.getPage(1);
-
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-
-    if (!context) throw new Error("Could not get canvas context");
-
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-    }).promise;
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(URL.createObjectURL(blob));
-        } else {
-          throw new Error("Failed to create blob from canvas");
-        }
-      }, "image/png");
-    });
-  } catch (error) {
-    console.error("Failed to render PDF preview:", error);
-    throw error;
-  }
-}
-
 export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardProps) {
   const { download } = useWalrusDownload();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoadingBlob, setIsLoadingBlob] = useState(false);
 
-  // Fetch blob from Walrus if blobId is provided
+  // Fetch blob from Walrus if blobId is provided (only for images)
   useEffect(() => {
-    if (blobId && !isLocked) {
+    if (blobId && !isLocked && content.type === "image") {
       setIsLoadingBlob(true);
       download(blobId)
-        .then(async (bytes) => {
-          // If it's a PDF, render the first page as a preview
-          if (content.type === "pdf") {
-            const previewUrl = await renderPdfFirstPage(bytes);
-            setBlobUrl(previewUrl);
-          } else {
-            // For images, create blob URL directly
-            const blob = new Blob([bytes]);
-            const url = URL.createObjectURL(blob);
-            setBlobUrl(url);
-          }
+        .then((bytes) => {
+          // For images, create blob URL directly
+          const blob = new Blob([bytes]);
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
         })
         .catch((error) => {
           console.error("Failed to download blob:", error);
@@ -94,14 +47,15 @@ export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardP
   }, [blobId, isLocked, download, content.type]);
 
   const displayUrl = blobUrl || content.thumbnail;
-  const getTypeIcon = () => {
+  const getTypeIcon = (size: "sm" | "lg" = "sm") => {
+    const className = size === "sm" ? "h-3 w-3" : "h-16 w-16";
     switch (content.type) {
       case "image":
-        return <ImageIcon className="h-3 w-3" />;
+        return <ImageIcon className={className} />;
       case "text":
-        return <FileText className="h-3 w-3" />;
+        return <FileText className={className} />;
       case "pdf":
-        return <FileType className="h-3 w-3" />;
+        return <BookOpen className={className} />;
     }
   };
 
@@ -125,6 +79,20 @@ export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardP
         <div className="relative aspect-video bg-muted flex items-center justify-center">
           {isLoadingBlob ? (
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          ) : content.type === "pdf" ? (
+            // PDFs show a book icon instead of preview
+            <div className="flex flex-col items-center justify-center space-y-2">
+              {isLocked ? (
+                <>
+                  {getTypeIcon("lg")}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                    <Lock className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                </>
+              ) : (
+                <div className="text-muted-foreground">{getTypeIcon("lg")}</div>
+              )}
+            </div>
           ) : displayUrl && !isLocked ? (
             <img
               src={displayUrl}
@@ -147,7 +115,7 @@ export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardP
               {isLocked ? (
                 <Lock className="h-12 w-12 text-muted-foreground" />
               ) : (
-                getTypeIcon()
+                getTypeIcon("lg")
               )}
             </div>
           )}

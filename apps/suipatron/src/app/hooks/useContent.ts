@@ -140,6 +140,78 @@ export function useContentUploadUnencrypted() {
 }
 
 /**
+ * NEW: Hook for uploading content with BUNDLED PTB (certify + publish in 1 transaction).
+ *
+ * Reduces signatures from 3 → 2:
+ * - Signature 1: Register blob with Walrus
+ * - Signature 2: Certify + Publish (BUNDLED in 1 PTB)
+ *
+ * Use this instead of useContentUploadUnencrypted for better UX.
+ */
+export function useContentUploadBundled() {
+  const suiClient = useSuiClient();
+  const packageId = useNetworkVariable("packageId");
+  const platformId = useNetworkVariable("platformId");
+  const account = useCurrentAccount();
+  const [isPending, setIsPending] = useState(false);
+
+  const contentService = useMemo(
+    () =>
+      createContentService({
+        suiClient,
+        packageId,
+        platformId,
+        network: "testnet",
+      }),
+    [suiClient, packageId, platformId],
+  );
+
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+  const upload = useCallback(
+    async (
+      params: ContentUploadParams,
+      creatorProfileId: string,
+      creatorCapId: string,
+    ) => {
+      if (!account?.address) throw new Error("Wallet not connected");
+      setIsPending(true);
+      try {
+        // Upload and get bundled transaction
+        const { blobId, bundledTx } = await contentService.uploadContentBundled(
+          params,
+          creatorProfileId,
+          creatorCapId,
+          async (tx) => {
+            const result = await signAndExecute({
+              transaction: tx.transaction,
+            });
+            return { digest: result.digest };
+          },
+          account.address,
+        );
+
+        console.log("🚀 Executing bundled PTB (certify + publish)...");
+
+        // Sign and execute the BUNDLED transaction (certify + publish in 1 signature!)
+        const bundledResult = await signAndExecute({
+          transaction: bundledTx,
+        });
+
+        console.log("✅ Bundled PTB executed! Digest:", bundledResult.digest);
+
+        return { blobId, publishDigest: bundledResult.digest };
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [contentService, signAndExecute, account?.address],
+  );
+
+  return { upload, isPending };
+}
+
+/**
  * Hook for decrypting content.
  *
  * Manages SEAL session key lifecycle (create once, reuse for 10 min).
