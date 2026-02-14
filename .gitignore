@@ -70,3 +70,6 @@ apps/*/.turbo
 
 # OS
 Thumbs.db
+
+# Local context
+local-context

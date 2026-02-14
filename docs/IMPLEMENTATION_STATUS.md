@@ -44,6 +44,66 @@ All core Move contracts are implemented, built, and tested. **18/18 unit tests p
 
 **Test categories:** init, profile creation, profile update, content publishing, access purchase, withdrawal, SEAL policy, full end-to-end flow
 
+### Contract Deployment (A9)
+
+Package deployed to SUI Testnet.
+
+| Item | Value |
+|------|-------|
+| Package ID | `0xf3a74f8992ff0304f55aa951f1340885e3aa0018c7118670fa6d6041216c923f` |
+| Platform ID | `0x694eb35d412e068c043c54791e7d705e7c7698a48aec2053ad794180680d3961` |
+
+Recorded in `packages/blockchain/sdk/networkConfig.ts` as network variables.
+
+### Service Layer (P3–P14)
+
+Complete service layer bridging Move contracts and React UI. All files type-check with zero errors against `@mysten/sui@2.4.0`, `@mysten/dapp-kit@1.0.3`, `@mysten/seal@1.0.1`, `@mysten/walrus@1.0.3`.
+
+**Dependencies installed:**
+- `@mysten/sui@2.4.0` (upgraded from 1.x — breaking v2 API)
+- `@mysten/dapp-kit@1.0.3` (upgraded from 0.x)
+- `@mysten/seal@1.0.1`
+- `@mysten/walrus@1.0.3`
+- `@mysten/enoki@1.0.3`
+
+**Network config** (`packages/blockchain/sdk/networkConfig.ts`):
+- Updated imports for SDK v2 (`getJsonRpcFullnodeUrl` from `@mysten/sui/jsonRpc`)
+- Added `network` property required by dapp-kit v1
+- `packageId` and `platformId` set for testnet
+
+**Constants** (`apps/dapp/app/constants.ts`):
+- SEAL canonical key servers (3 testnet servers), threshold = 2
+- Walrus aggregator URL, upload relay URL, WASM URL, default epochs
+- Clock object ID, MIST conversion, supported content types
+
+**Type definitions** (`apps/dapp/app/types/index.ts`):
+- TypeScript interfaces: `CreatorProfile`, `Content`, `AccessPass`, `CreatorCap`
+- Event types: `ProfileCreatedEvent`, `ContentPublishedEvent`, `AccessPurchasedEvent`, `EarningsWithdrawnEvent`, `ProfileUpdatedEvent`
+- DTOs: `ProfileUpdateParams`, `ContentUploadParams`
+- Parser functions: `parseCreatorProfile()`, `parseAccessPass()`, `parseCreatorCap()`, `parseContent()` — handle Move→TS field mapping (Option, u64-as-string, ID)
+
+**Services** (`apps/dapp/app/services/`):
+
+| File | Description |
+|------|-------------|
+| `transactionService.ts` | PTB builders for all 5 entry functions. Uses `tx.pure.option()` for partial updates, `tx.splitCoins()` for payment. |
+| `creatorService.ts` | On-chain reads: `getCreatorProfile()`, `getCreatorProfiles()` (event-based discovery), `getContentList()` (dynamic fields), `getCreatorByOwner()`, `getCreatorCapByOwner()`. |
+| `accessPassService.ts` | AccessPass queries: `getAccessPassesByOwner()`, `getAccessPassForCreator()`, `hasAccessToCreator()`. |
+| `walrusService.ts` | Upload via flow API (encode→register→upload→certify) with upload relay. Download via aggregator HTTP with SDK fallback. Lazy WalrusClient init to avoid SSR WASM issues. |
+| `sealService.ts` | Encrypt with creator profile identity. Decrypt with dynamic server matching (parses `EncryptedObject` BCS to find servers). Session key creation with wallet personal message signing. |
+| `contentService.ts` | Orchestrator: `uploadContent()` = read file → SEAL encrypt → Walrus upload → build publish_content tx. `downloadContent()` = Walrus download → SEAL decrypt. Avatar upload/download (no encryption). |
+| `index.ts` | Barrel exports for all services and factory functions. |
+
+**React hooks** (`apps/dapp/app/hooks/`):
+
+| File | Hooks |
+|------|-------|
+| `useCreator.ts` | `useCreatorProfile(id)`, `useCreatorProfiles(limit?)`, `useMyCreatorProfile(address)`, `useMyCreatorCap(address)`, `useContentList(profileId)` |
+| `useAccessPass.ts` | `useMyAccessPasses(address)`, `useHasAccess(address, creatorProfileId)` |
+| `useTransactions.ts` | `useSuiPatronTransactions()` — returns `{ createProfile, updateProfile, purchaseAccess, withdrawEarnings, isPending }` |
+| `useContent.ts` | `useContentUpload()` — full encrypt+upload+publish flow. `useContentDecrypt()` — download+decrypt with session key lifecycle (auto-create, 10min TTL, auto-recreate on expiry). |
+| `index.ts` | Barrel exports for all hooks. |
+
 ### Documentation
 
 | File | Description |
@@ -56,26 +116,15 @@ All core Move contracts are implemented, built, and tested. **18/18 unit tests p
 
 ## Remaining — MVP Tasks
 
-### 1. Contract Deployment (A9)
+### 1. Contract Deployment — Post-deploy Tasks
 
-Deploy the Move package to SUI Testnet and record object IDs.
-
-```bash
-cd move/suipatron && sui client publish --gas-budget 200000000
-```
-
-After publishing, record:
-- [ ] Package ID → `VITE_PACKAGE_ID` in `frontend/.env`
-- [ ] Platform object ID → `VITE_PLATFORM_ID` in `frontend/.env`
 - [ ] AdminCap object ID (keep safe, not in env)
 - [ ] Update Enoki Portal with new Package ID in allowed move call targets
 - [ ] Smoke test via CLI: `sui client call --package {PKG} --module suipatron --function create_profile ...`
 
 ### 2. Frontend Scaffold (Z1, J1–J4)
 
-- [ ] Initialize Vite + React + TypeScript + Tailwind project in `frontend/`
-- [ ] Configure `vite.config.ts`, `tsconfig.json`, `tailwind.config.ts`
-- [ ] Install SUI SDKs: `@mysten/sui`, `@mysten/dapp-kit`, `@mysten/enoki`, `@mysten/seal`, `@mysten/walrus`
+- [x] Install SUI SDKs: `@mysten/sui`, `@mysten/dapp-kit`, `@mysten/enoki`, `@mysten/seal`, `@mysten/walrus`
 - [ ] Design system components: Button, Card, Modal, Badge, Toast, Avatar, LoadingSpinner, EmptyState
 - [ ] Layout shell: Header with nav, responsive main content area
 - [ ] Landing page (`/`) — hero, value prop, "Sign in with Google" CTA
@@ -99,30 +148,10 @@ After publishing, record:
 - [ ] `GET /api/creator/:id` — get creator profile + content list
 - [ ] Event indexer — poll SUI events, build queryable state (in-memory or KV store)
 
-### 5. Integration Hooks / Services (P3–P14)
-
-PTB builders (transaction construction):
-- [ ] `buildCreateProfileTx(name, bio, price)` — creates CreatorProfile + CreatorCap
-- [ ] `buildUpdateProfileTx(profileId, updates)` — updates profile metadata
-- [ ] `buildPublishContentTx(profileId, title, desc, blobId, contentType)` — publishes content
-- [ ] `buildPurchaseAccessTx(platformId, profileId, price)` — purchases access + mints AccessPass
-- [ ] `buildWithdrawTx(profileId)` — withdraws creator earnings
-
-SEAL integration:
-- [ ] `encryptContent(data, creatorProfileId, packageId)` — SEAL encrypt with creator's identity
-- [ ] `decryptContent(encryptedData, accessPass, sessionKey)` — SEAL decrypt via seal_approve
-
-Walrus integration:
-- [ ] `uploadToWalrus(encryptedData)` — store blob, return blobId
-- [ ] `downloadFromWalrus(blobId)` — retrieve encrypted blob
+### 5. Integration — Remaining Items
 
 Sponsored transaction flow:
 - [ ] Wire up Enoki `sponsorAndExecuteTransaction` for all user actions
-
-React hooks:
-- [ ] `useMyAccessPasses()` — fetch user's AccessPass NFTs via `getOwnedObjects`
-- [ ] `useCreatorProfile(id)` — fetch creator profile data
-- [ ] `useContentDecrypt(blobId, accessPass)` — download + decrypt content
 
 ### 6. UI Pages (J5–J13)
 
@@ -156,7 +185,7 @@ React hooks:
 
 ## Technical Notes & Gotchas
 
-These were discovered during smart contract implementation. Keep adding to this list.
+These were discovered during implementation. Keep adding to this list.
 
 ### Move / SUI CLI
 
@@ -165,18 +194,36 @@ These were discovered during smart contract implementation. Keep adding to this 
 - **`take_shared_by_id`**: When multiple shared objects of the same type exist in a test scenario, `take_shared<T>` may grab the wrong one. Use `take_shared_by_id<T>(&scenario, object_id)` for deterministic selection.
 - **Literal types**: Use typed literals like `3u64` instead of bare `3` to avoid warnings.
 
+### SUI SDK v2 Migration (`@mysten/sui@2.4.0`)
+
+- **`SuiClient` removed**: Replaced by `CoreClient` (minimal: getObject, getDynamicField, etc.) from `@mysten/sui/client` and `SuiJsonRpcClient` (full JSON-RPC: queryEvents, getOwnedObjects, multiGetObjects, etc.) from `@mysten/sui/jsonRpc`.
+- **`getFullnodeUrl` removed**: Use `getJsonRpcFullnodeUrl` from `@mysten/sui/jsonRpc`.
+- **`SuiObjectData`**: Now exported from `@mysten/sui/jsonRpc` (not `@mysten/sui/client`).
+- **`useSuiClient()`**: Returns `SuiJsonRpcClient` in dapp-kit v1. This satisfies both `SealCompatibleClient` and `ClientWithCoreApi` since `SuiJsonRpcClient` has a `core: JSONRpcCoreClient` property.
+- **`createNetworkConfig`**: Now requires a `network` property in each config entry (e.g., `network: "testnet"`).
+- **`tx.pure.option()`**: Works in v2 for both `"string"` and `"u64"` types — tested and verified.
+
 ### SEAL Encryption
 
 - **Identity format (MVP)**: 32 bytes = CreatorProfile object ID bytes. All content for a creator shares the same identity.
 - **`packageId` for SEAL SDK**: Must be hex-encoded WITHOUT the `0x` prefix (check SDK docs).
 - **Threshold**: Set to 2 (at least 2 key servers must agree).
-- **Session keys**: Cached per-user per-package. First decrypt requires wallet signature; subsequent ones reuse the session.
+- **Session keys**: Cached per-user per-package. First decrypt requires wallet signature; subsequent ones reuse the session (10 min TTL).
+- **Dynamic server matching**: When decrypting, parse `EncryptedObject` BCS to extract the server IDs used during encryption, then create a matched `SealClient` for reliability.
+
+### Walrus Storage
+
+- **Upload relay**: Use `https://upload-relay.testnet.walrus.space` with a tip of 1000 MIST per upload for reliable uploads (bypasses unreliable direct storage node connections).
+- **Aggregator-first download**: Fetch from `https://aggregator.walrus-testnet.walrus.space/v1/blobs/{blobId}` first (fast HTTP), fall back to SDK `readBlob()`.
+- **Lazy init**: `WalrusClient` loads WASM — must not initialize during SSR. Use lazy `ensureClient()` pattern.
+- **Flow API timing**: After the registration transaction, wait ~5 seconds for network sync before uploading slivers.
 
 ### Architecture Decisions
 
 - **Flat one-time payment**: No expiry, no tiers, no renewal logic. Simplest possible MVP. Tiers planned for Phase 2.
 - **Content keyed by `u64` index**: `profile.content_count` used as auto-incrementing key for DOF. Simple but means content cannot be deleted/reordered without gaps.
 - **AccessPass stores `supporter: address`**: Used by `seal_approve` to verify the caller owns the pass. Important for SEAL validation.
+- **Service layer uses `SuiJsonRpcClient`**: Services accept `SuiJsonRpcClient` (from dapp-kit's `useSuiClient()`) which provides both full JSON-RPC methods and core client compatibility for SEAL/Walrus.
 
 ---
 
@@ -188,7 +235,7 @@ For frontend developers building PTBs.
 
 ```
 suipatron::suipatron::create_profile(
-    platform: &mut Platform,        // shared object — VITE_PLATFORM_ID
+    platform: &mut Platform,        // shared object — platformId
     name: String,
     bio: String,
     price: u64,                     // in MIST (1 SUI = 1_000_000_000)
@@ -286,17 +333,11 @@ See `CLAUDE.md` for full environment variable reference. Quick start:
 
 ```bash
 # 1. Build and test contracts
-cd move/suipatron && sui move build && sui move test
+cd packages/blockchain/contracts && sui move build && sui move test
 
-# 2. Deploy to testnet (when ready)
-sui client publish --gas-budget 200000000
-
-# 3. Record Package ID and Platform ID from publish output
-
-# 4. Set up frontend
-cd frontend && npm install
-# Copy .env.example, fill in VITE_PACKAGE_ID, VITE_PLATFORM_ID, etc.
-npm run dev
+# 2. Start the dapp (monorepo)
+pnpm install
+pnpm --filter @hack/dapp dev
 ```
 
 ---
@@ -311,4 +352,4 @@ npm run dev
 
 ---
 
-*Last updated: Smart contracts completed (18/18 tests pass). Frontend, backend, and integrations are next.*
+*Last updated: Service layer completed (services + hooks, type-checked). Smart contracts deployed to testnet. UI pages, auth, and backend remaining.*
