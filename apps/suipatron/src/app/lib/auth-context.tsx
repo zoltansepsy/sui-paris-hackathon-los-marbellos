@@ -14,6 +14,7 @@ import {
   isEnokiConfigured,
   enokiApiKey,
   googleClientId,
+  enokiNetwork,
 } from "./enoki-provider";
 
 interface AuthContextType {
@@ -71,6 +72,7 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
       provider: "google",
       clientId: googleClientId,
       redirectUrl,
+      network: enokiNetwork,
     });
     window.location.href = url;
   }, [enoki]);

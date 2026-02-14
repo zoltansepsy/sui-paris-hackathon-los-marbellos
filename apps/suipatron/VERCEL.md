@@ -30,3 +30,10 @@ In **Settings → Git**:
 - **buildCommand:** `pnpm run build` (runs `next build` in this app).
 
 Environment variables must be set in the Vercel dashboard (mirror `.env.example` and secrets from `.env.local`).
+
+## Enoki 403: "The requested network is not enabled for this API key"
+
+If zkLogin (Google sign-in) fails with a 403 from `api.enoki.mystenlabs.com`:
+
+1. **Enable the network for your API key** in the [Enoki Developer Portal](https://portal.enoki.mystenlabs.com): open your app → API keys → select the key used by `NEXT_PUBLIC_ENOKI_PUBLIC_KEY` → ensure the network you use (e.g. **testnet**) is enabled for that key.
+2. **Match env to the key:** set `NEXT_PUBLIC_SUI_NETWORK` to the same network (e.g. `testnet`). The app now passes this network explicitly when creating the zkLogin auth URL.
