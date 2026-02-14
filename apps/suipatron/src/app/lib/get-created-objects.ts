@@ -1,4 +1,4 @@
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { getJsonRpcFullnodeUrl, SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 
 export interface CreatedProfileResult {
   profileId: string;
@@ -12,10 +12,10 @@ export async function getCreatedProfileFromTx(
     process.env.NEXT_PUBLIC_SUI_NETWORK ??
     process.env.VITE_SUI_NETWORK ??
     "testnet";
-  const client = new SuiClient({
-    url: getFullnodeUrl(
-      network as "mainnet" | "testnet" | "devnet" | "localnet",
-    ),
+  const net = network as "mainnet" | "testnet" | "devnet" | "localnet";
+  const client = new SuiJsonRpcClient({
+    url: getJsonRpcFullnodeUrl(net),
+    network: net,
   });
   const tx = await client.getTransactionBlock({
     digest,

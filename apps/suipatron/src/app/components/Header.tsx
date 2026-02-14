@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
+import { ConnectButton } from "@mysten/dapp-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import {
@@ -175,14 +176,7 @@ export function Header() {
               </Sheet>
             </>
           ) : (
-            <>
-              <Link href="/?signin=true" className="hidden sm:block">
-                <Button>Sign in with Google</Button>
-              </Link>
-              <Link href="/?signin=true" className="sm:hidden">
-                <Button size="sm">Sign in</Button>
-              </Link>
-            </>
+            <ConnectButton />
           )}
         </div>
       </div>

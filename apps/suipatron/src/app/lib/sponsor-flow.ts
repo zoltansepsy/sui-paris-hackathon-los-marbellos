@@ -2,20 +2,20 @@
  * Sponsor flow: build PTB -> sponsor via API -> sign with Enoki -> execute.
  */
 
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { getJsonRpcFullnodeUrl, SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { fromBase64, toBase64 } from "@mysten/bcs";
 
 const API_BASE = ""; // Same origin for Next.js API routes
 
-async function getSuiClient(): Promise<SuiClient> {
+async function getSuiClient(): Promise<SuiJsonRpcClient> {
   const network =
     process.env.NEXT_PUBLIC_SUI_NETWORK ??
     process.env.VITE_SUI_NETWORK ??
     "testnet";
-  return new SuiClient({
-    url: getFullnodeUrl(
-      network as "mainnet" | "testnet" | "devnet" | "localnet",
-    ),
+  const net = network as "mainnet" | "testnet" | "devnet" | "localnet";
+  return new SuiJsonRpcClient({
+    url: getJsonRpcFullnodeUrl(net),
+    network: net,
   });
 }
 

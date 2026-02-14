@@ -1,43 +1,78 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
-import { useAccessPasses } from "../lib/access-pass";
+import { useCreatorProfile, useContentList } from "../hooks/useCreator";
+import { useHasAccess } from "../hooks/useAccessPass";
+import {
+  creatorProfileToCreator,
+  onchainContentToContent,
+} from "../lib/adapters";
+import { LoadingState } from "../components/LoadingState";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
 import { mockCreators, mockContent } from "../lib/mock-data";
-import { Users, Lock, CheckCircle2, Settings } from "lucide-react";
+import {
+  Users,
+  Lock,
+  CheckCircle2,
+  Settings,
+  ExternalLink,
+} from "lucide-react";
+import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 
 export function CreatorProfile() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
-  const { user } = useAuth();
-  const { hasAccessPass, refresh } = useAccessPasses(user?.id);
+  const { user, walletAddress } = useAuth();
   const [showSupportModal, setShowSupportModal] = useState(false);
 
-  const creator = mockCreators.find((c) => c.id === id);
+  // On-chain queries
+  const { data: profile, isLoading: profileLoading } = useCreatorProfile(id);
+  const { data: onchainContent } = useContentList(id);
+  const { data: accessPass } = useHasAccess(walletAddress ?? undefined, id);
 
-  useEffect(() => {
-    if (id && !creator) {
-      router.replace("/explore");
-    }
-  }, [id, creator, router]);
+  // Adapt on-chain data to UI types, fall back to mock
+  const mockCreator = mockCreators.find((c) => c.id === id);
+  const creator = profile ? creatorProfileToCreator(profile) : mockCreator;
 
-  if (!creator) {
-    return null;
+  if (profileLoading) {
+    return <LoadingState />;
   }
 
-  const creatorContent = mockContent.filter((c) => c.creatorId === creator.id);
-  const userHasAccess = user ? hasAccessPass(creator.id) : false;
-  const isOwnProfile =
-    user?.id === creator.id ||
-    (user?.isCreator && user?.email === creator.email);
+  if (!creator) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-lg text-muted-foreground">Creator not found</p>
+        <Link href="/explore">
+          <Button variant="outline" className="mt-4">
+            Back to Explore
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const userHasAccess = !!accessPass;
+  const isOwnProfile = walletAddress
+    ? profile?.owner === walletAddress
+    : user?.id === creator.id;
+
+  const creatorContent =
+    onchainContent && onchainContent.length > 0
+      ? onchainContent.map((c) =>
+          onchainContentToContent(
+            c,
+            creator.id,
+            userHasAccess || !!isOwnProfile,
+          ),
+        )
+      : mockContent.filter((c) => c.creatorId === creator.id);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -153,18 +188,54 @@ export function CreatorProfile() {
 
           {creatorContent.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {creatorContent.map((content) => (
-                <ContentCard
-                  key={content.id}
-                  content={content}
-                  isLocked={!userHasAccess && !isOwnProfile}
-                  onClick={
-                    !userHasAccess && !isOwnProfile
-                      ? () => setShowSupportModal(true)
-                      : undefined
-                  }
-                />
-              ))}
+              {creatorContent.map((content) => {
+                const blobId = (content as any).blobId;
+                const blobUrl = blobId
+                  ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
+                  : null;
+
+                // Debug: log to see if blobId exists
+                console.log(
+                  "Content:",
+                  content.title,
+                  "BlobId:",
+                  blobId,
+                  "Has URL:",
+                  !!blobUrl,
+                );
+
+                return (
+                  <div key={content.id} className="space-y-2">
+                    <ContentCard
+                      content={content}
+                      isLocked={!userHasAccess && !isOwnProfile}
+                      blobId={blobId}
+                      onClick={
+                        !userHasAccess && !isOwnProfile
+                          ? () => setShowSupportModal(true)
+                          : undefined
+                      }
+                    />
+                    {blobUrl && (
+                      <a
+                        href={blobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-2" />
+                          View Encrypted Blob (SEAL Demo)
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 space-y-2">
@@ -183,7 +254,7 @@ export function CreatorProfile() {
           creator={creator}
           open={showSupportModal}
           onOpenChange={setShowSupportModal}
-          onSuccess={() => refresh()}
+          onSuccess={() => {}}
         />
       )}
     </div>

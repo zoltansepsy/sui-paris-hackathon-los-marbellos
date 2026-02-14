@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(pnpm dev:*)",
+      "WebFetch(domain:gateway.walrus.space)"
+    ]
+  }
+}

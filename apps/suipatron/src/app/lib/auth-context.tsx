@@ -19,6 +19,8 @@ import {
 
 interface AuthContextType {
   user: User | null;
+  /** zkLogin address (Enoki) or null (mock). Use for on-chain queries. */
+  walletAddress: string | null;
   isLoading: boolean;
   signIn: (emailOrRedirect?: string) => Promise<void>;
   signOut: () => void;
@@ -88,7 +90,14 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, signIn, signOut, updateUser }}
+      value={{
+        user,
+        walletAddress: user?.id ?? null,
+        isLoading,
+        signIn,
+        signOut,
+        updateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -148,6 +157,7 @@ function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        walletAddress: null,
         isLoading,
         signIn: (e) => signIn(typeof e === "string" ? e : "demo@example.com"),
         signOut,

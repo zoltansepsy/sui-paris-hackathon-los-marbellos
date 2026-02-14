@@ -18,7 +18,8 @@ import {
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import type { Creator } from "../lib/mock-data";
+import type { Creator } from "@/shared/types/creator.types";
+import { MIST_PER_SUI } from "../constants";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
@@ -123,12 +124,15 @@ function SupportModalWithSponsor(props: SupportModalProps) {
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
+            disabled={isProcessing || sponsorTx.isLoading}
           >
             Cancel
           </Button>
-          <Button onClick={handleSupport} disabled={isProcessing}>
-            {isProcessing ? (
+          <Button
+            onClick={handleSupport}
+            disabled={isProcessing || sponsorTx.isLoading}
+          >
+            {isProcessing || sponsorTx.isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
