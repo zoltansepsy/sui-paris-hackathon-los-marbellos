@@ -16,9 +16,9 @@ const { networkConfig, useNetworkVariable, useNetworkVariables } =
       url: getFullnodeUrl("testnet"),
       variables: {
         packageId:
-          "0xf3a74f8992ff0304f55aa951f1340885e3aa0018c7118670fa6d6041216c923f",
+          "0xf1584d9ac12e8a33937c22996284b38d3b5b262fe84a77b50c2da920eb472ba9",
         platformId:
-          "0x694eb35d412e068c043c54791e7d705e7c7698a48aec2053ad794180680d3961",
+          "0xe766ee75db9f4dbbdd57045f6b5aaf4fb7bcdf587b653f08ae82534cb27c7c84",
       },
     },
     mainnet: {

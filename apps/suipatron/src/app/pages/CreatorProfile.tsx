@@ -17,7 +17,8 @@ import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
 import { mockCreators, mockContent } from "../lib/mock-data";
-import { Users, Lock, CheckCircle2, Settings } from "lucide-react";
+import { Users, Lock, CheckCircle2, Settings, ExternalLink } from "lucide-react";
+import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 
 export function CreatorProfile() {
   const params = useParams();
@@ -181,18 +182,47 @@ export function CreatorProfile() {
 
           {creatorContent.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {creatorContent.map((content) => (
-                <ContentCard
-                  key={content.id}
-                  content={content}
-                  isLocked={!userHasAccess && !isOwnProfile}
-                  onClick={
-                    !userHasAccess && !isOwnProfile
-                      ? () => setShowSupportModal(true)
-                      : undefined
-                  }
-                />
-              ))}
+              {creatorContent.map((content) => {
+                const blobId = (content as any).blobId;
+                const blobUrl = blobId
+                  ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
+                  : null;
+
+                // Debug: log to see if blobId exists
+                console.log("Content:", content.title, "BlobId:", blobId, "Has URL:", !!blobUrl);
+
+                return (
+                  <div key={content.id} className="space-y-2">
+                    <ContentCard
+                      content={content}
+                      isLocked={!userHasAccess && !isOwnProfile}
+                      blobId={blobId}
+                      onClick={
+                        !userHasAccess && !isOwnProfile
+                          ? () => setShowSupportModal(true)
+                          : undefined
+                      }
+                    />
+                    {blobUrl && (
+                      <a
+                        href={blobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-2" />
+                          View Encrypted Blob (SEAL Demo)
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 space-y-2">

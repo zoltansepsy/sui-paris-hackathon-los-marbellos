@@ -1,15 +1,99 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Lock, Image as ImageIcon, FileText, FileType } from "lucide-react";
+import { Lock, Image as ImageIcon, FileText, FileType, Loader2 } from "lucide-react";
 import type { Content } from "@/shared/types/creator.types";
+import { useWalrusDownload } from "../hooks/useContent";
 
 interface ContentCardProps {
   content: Content;
   isLocked: boolean;
   onClick?: () => void;
+  blobId?: string; // Walrus blob ID for fetching content
 }
 
-export function ContentCard({ content, isLocked, onClick }: ContentCardProps) {
+async function renderPdfFirstPage(bytes: Uint8Array): Promise<string> {
+  try {
+    // Dynamically import PDF.js only on client side
+    const pdfjsLib = await import("pdfjs-dist");
+
+    // Configure worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+    const loadingTask = pdfjsLib.getDocument({ data: bytes });
+    const pdf = await loadingTask.promise;
+    const page = await pdf.getPage(1);
+
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    if (!context) throw new Error("Could not get canvas context");
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+    }).promise;
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(URL.createObjectURL(blob));
+        } else {
+          throw new Error("Failed to create blob from canvas");
+        }
+      }, "image/png");
+    });
+  } catch (error) {
+    console.error("Failed to render PDF preview:", error);
+    throw error;
+  }
+}
+
+export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardProps) {
+  const { download } = useWalrusDownload();
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoadingBlob, setIsLoadingBlob] = useState(false);
+
+  // Fetch blob from Walrus if blobId is provided
+  useEffect(() => {
+    if (blobId && !isLocked) {
+      setIsLoadingBlob(true);
+      download(blobId)
+        .then(async (bytes) => {
+          // If it's a PDF, render the first page as a preview
+          if (content.type === "pdf") {
+            const previewUrl = await renderPdfFirstPage(bytes);
+            setBlobUrl(previewUrl);
+          } else {
+            // For images, create blob URL directly
+            const blob = new Blob([bytes]);
+            const url = URL.createObjectURL(blob);
+            setBlobUrl(url);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to download blob:", error);
+        })
+        .finally(() => {
+          setIsLoadingBlob(false);
+        });
+    }
+
+    // Cleanup blob URL on unmount
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobId, isLocked, download, content.type]);
+
+  const displayUrl = blobUrl || content.thumbnail;
   const getTypeIcon = () => {
     switch (content.type) {
       case "image":
@@ -39,18 +123,20 @@ export function ContentCard({ content, isLocked, onClick }: ContentCardProps) {
     >
       <CardContent className="p-0">
         <div className="relative aspect-video bg-muted flex items-center justify-center">
-          {content.thumbnail && !isLocked ? (
+          {isLoadingBlob ? (
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          ) : displayUrl && !isLocked ? (
             <img
-              src={content.thumbnail}
+              src={displayUrl}
               alt={content.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
-          ) : content.thumbnail ? (
+          ) : displayUrl ? (
             <>
               <img
-                src={content.thumbnail}
+                src={displayUrl}
                 alt={content.title}
-                className="w-full h-full object-cover blur-xl opacity-30"
+                className="w-full h-full object-contain blur-xl opacity-30"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Lock className="h-12 w-12 text-muted-foreground" />

@@ -32,7 +32,7 @@ export function onchainContentToContent(
   content: OnchainContent,
   creatorId: string,
   hasAccess: boolean,
-): Content {
+): Content & { blobId: string } {
   return {
     id: content.objectId,
     creatorId,
@@ -41,5 +41,6 @@ export function onchainContentToContent(
     type: (content.contentType as "image" | "text" | "pdf") || "image",
     isLocked: !hasAccess,
     createdAt: new Date(content.createdAt),
+    blobId: content.blobId, // Preserve blobId for Walrus fetching
   };
 }

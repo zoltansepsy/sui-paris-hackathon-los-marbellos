@@ -11,6 +11,7 @@ import {
 import { useSuiPatronTransactions } from "../hooks/useTransactions";
 import { useContentUpload } from "../hooks/useContent";
 import { onchainContentToContent } from "../lib/adapters";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { MIST_PER_SUI } from "../constants";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -39,7 +40,6 @@ import { mockContent } from "../lib/mock-data";
 import { DollarSign, Users, FileUp, Loader2, CheckCircle2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
-import { useCurrentAccount } from "@mysten/dapp-kit";
 
 export function Dashboard() {
   const { user, walletAddress, updateUser } = useAuth();
@@ -76,6 +76,14 @@ export function Dashboard() {
   );
   const [suinsInput, setSuinsInput] = useState("");
 
+  // Upload form states
+  const [contentTitle, setContentTitle] = useState("");
+  const [contentDescription, setContentDescription] = useState("");
+  const [contentType, setContentType] = useState<"image" | "text" | "pdf">(
+    "image",
+  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   useEffect(() => {
     if (!user) {
       router.push("/?signin=true");
@@ -85,33 +93,27 @@ export function Dashboard() {
   if (!user) return null;
 
   const handleBecomeCreator = async () => {
-    if (walletAddress) {
-      try {
-        const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
-        await createProfile(name || user!.name, bio, priceInMist);
-        queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
-        queryClient.invalidateQueries({ queryKey: ["myCreatorCap"] });
-        toast.success("Creator profile created on-chain!");
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to create profile",
-        );
-        return;
-      }
-    } else {
-      updateUser({
-        isCreator: true,
-        creatorProfile: {
-          bio: "",
-          price: 5,
-          balance: 0,
-          contentCount: 0,
-          supporterCount: 0,
-        },
-      });
+    if (!walletAddress) {
+      toast.error("Please connect your wallet to become a creator");
+      return;
     }
-    setIsEditing(true);
-    toast.success("Welcome! Set up your creator profile.");
+
+    try {
+      const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
+      await createProfile(name || user!.name, bio, priceInMist);
+
+      // Invalidate all creator-related queries so they refetch
+      queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["myCreatorCap"] });
+      queryClient.invalidateQueries({ queryKey: ["creatorProfiles"] }); // ✅ Added: Updates Explore page
+
+      toast.success("Creator profile created on-chain!");
+      setIsEditing(true);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create profile",
+      );
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -163,6 +165,63 @@ export function Dashboard() {
     setShowSuiNSModal(false);
     setSuinsInput("");
     toast.success("SuiNS name claimed successfully!");
+  };
+
+  const handleContentUpload = async () => {
+    if (!selectedFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+    if (!contentTitle.trim()) {
+      toast.error("Please enter a title");
+      return;
+    }
+    if (!myProfile?.objectId || !myCreatorCap?.objectId) {
+      toast.error("Creator profile not found");
+      return;
+    }
+    if (!account) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    try {
+      const result = await uploadContent(
+        {
+          file: selectedFile,
+          title: contentTitle,
+          description: contentDescription,
+          contentType,
+        },
+        myProfile.objectId,
+        myCreatorCap.objectId,
+      );
+
+      // Log blob ID for SEAL verification
+      console.log("🔒 SEAL VERIFICATION - Blob ID:", result.blobId);
+      console.log("🔗 Check encrypted blob at:", `https://aggregator.walrus-testnet.walrus.space/blobs/${result.blobId}`);
+
+      toast.success("Content uploaded to Walrus and published on-chain!");
+      setShowUploadModal(false);
+
+      // Reset form
+      setContentTitle("");
+      setContentDescription("");
+      setContentType("image");
+      setSelectedFile(null);
+
+      // Invalidate and refetch content list for this profile
+      await queryClient.invalidateQueries({
+        queryKey: ["contentList", myProfile?.objectId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ["contentList", myProfile?.objectId],
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload content",
+      );
+    }
   };
 
   // User is a creator if they have an on-chain profile or the mock flag is set
@@ -434,6 +493,9 @@ export function Dashboard() {
                       ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
                       : null;
 
+                    // Debug: log to see if blobId exists
+                    console.log("Dashboard Content:", content.title, "BlobId:", blobId, "Has URL:", !!blobUrl);
+
                     return (
                       <div key={content.id} className="space-y-2">
                         <ContentCard
@@ -458,20 +520,18 @@ export function Dashboard() {
                                 🔒 Encrypted
                               </Button>
                             </a>
-                            <a
-                              href={`data:text/html,<html><body><h1>Decrypted Content</h1><p>In a full implementation, this would show the decrypted content. For the demo, the preview is shown in the card above.</p><p><a href="${blobUrl}" target="_blank">View Encrypted Blob</a></p></body></html>`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1"
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                // The decrypted version is already shown in the ContentCard above
+                                // For demo, we can indicate this or implement a full-screen view
+                                alert("The decrypted version is displayed in the card above. The encrypted blob (left button) shows garbage data from Walrus.");
+                              }}
                             >
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="w-full text-xs"
-                              >
-                                ✓ Decrypted
-                              </Button>
-                            </a>
+                              ✓ Decrypted
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -510,20 +570,40 @@ export function Dashboard() {
             <div className="space-y-2">
               <Label>Content Type</Label>
               <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "image" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("image")}
+                >
                   Image
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "text" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("text")}
+                >
                   Text
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "pdf" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("pdf")}
+                >
                   PDF
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" placeholder="Content title..." />
+              <Input
+                id="title"
+                placeholder="Content title..."
+                value={contentTitle}
+                onChange={(e) => setContentTitle(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -531,13 +611,33 @@ export function Dashboard() {
                 id="description"
                 placeholder="Optional description..."
                 rows={3}
+                value={contentDescription}
+                onChange={(e) => setContentDescription(e.target.value)}
               />
             </div>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center">
-              <FileUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">
-                Drop your file here or click to browse
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">File</Label>
+              <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors">
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setSelectedFile(file);
+                  }}
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <FileUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  {selectedFile ? (
+                    <p className="text-sm font-medium">{selectedFile.name}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Click to select a file
+                    </p>
+                  )}
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -545,19 +645,13 @@ export function Dashboard() {
               Cancel
             </Button>
             <Button
-              disabled={uploadPending}
-              onClick={() => {
-                // Upload integration — currently shows success toast
-                // Full SEAL+Walrus upload requires file input wiring
-                toast.success("Content uploaded successfully!");
-                setShowUploadModal(false);
-                queryClient.invalidateQueries({ queryKey: ["contentList"] });
-              }}
+              disabled={uploadPending || !selectedFile || !contentTitle.trim()}
+              onClick={handleContentUpload}
             >
               {uploadPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  Uploading to Walrus...
                 </>
               ) : (
                 "Publish"

@@ -151,6 +151,25 @@ export class CreatorService {
     if (!first?.data) return null;
     return parseCreatorCap(first.data);
   }
+
+  /**
+   * Fetch multiple creator profiles by their object IDs.
+   * Used for Feed page to show creators the user supports.
+   */
+  async getCreatorProfilesByIds(
+    profileIds: string[],
+  ): Promise<CreatorProfile[]> {
+    if (profileIds.length === 0) return [];
+
+    const objects = await this.suiClient.multiGetObjects({
+      ids: profileIds,
+      options: { showContent: true },
+    });
+
+    return objects
+      .map((obj) => (obj.data ? parseCreatorProfile(obj.data) : null))
+      .filter((p): p is CreatorProfile => p !== null);
+  }
 }
 
 export function createCreatorService(

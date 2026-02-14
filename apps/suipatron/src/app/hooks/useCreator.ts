@@ -105,3 +105,24 @@ export function useContentList(profileId: string | undefined) {
     staleTime: 30_000,
   });
 }
+
+/**
+ * Hook to get multiple creator profiles by their IDs.
+ * Used for Feed page to show supported creators.
+ */
+export function useCreatorProfilesByIds(profileIds: string[] | undefined) {
+  const suiClient = useSuiClient();
+  const packageId = useNetworkVariable("packageId");
+
+  const service = useMemo(
+    () => createCreatorService(suiClient, packageId),
+    [suiClient, packageId],
+  );
+
+  return useQuery({
+    queryKey: ["creatorProfilesByIds", profileIds?.join(",")],
+    queryFn: () => service.getCreatorProfilesByIds(profileIds!),
+    enabled: !!profileIds && profileIds.length > 0,
+    staleTime: 30_000,
+  });
+}

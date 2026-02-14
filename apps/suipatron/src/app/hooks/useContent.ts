@@ -35,16 +35,7 @@ export function useContentUpload() {
     [suiClient, packageId, platformId],
   );
 
-  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction({
-    execute: async ({ bytes, signature }) => {
-      const result = await suiClient.executeTransactionBlock({
-        transactionBlock: bytes,
-        signature,
-        options: { showEffects: true },
-      });
-      return result;
-    },
-  });
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
   const upload = useCallback(
     async (
@@ -79,6 +70,70 @@ export function useContentUpload() {
       }
     },
     [contentService, signAndExecute, account?.address],
+  );
+
+  return { upload, isPending };
+}
+
+/**
+ * Hook for uploading unencrypted content (MVP - Walrus only, no SEAL).
+ *
+ * Handles: File → Walrus upload → publish_content tx.
+ */
+export function useContentUploadUnencrypted() {
+  const suiClient = useSuiClient();
+  const packageId = useNetworkVariable("packageId");
+  const platformId = useNetworkVariable("platformId");
+  const account = useCurrentAccount();
+  const [isPending, setIsPending] = useState(false);
+
+  const contentService = useMemo(
+    () =>
+      createContentService({
+        suiClient,
+        packageId,
+        platformId,
+        network: "testnet",
+      }),
+    [suiClient, packageId, platformId],
+  );
+
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+  const upload = useCallback(
+    async (
+      params: ContentUploadParams,
+      creatorProfileId: string,
+      creatorCapId: string,
+    ) => {
+      if (!account?.address) throw new Error("Wallet not connected");
+      setIsPending(true);
+      try {
+        const { blobId, publishTx } =
+          await contentService.uploadContentUnencrypted(
+            params,
+            creatorProfileId,
+            creatorCapId,
+            async (tx) => {
+              const result = await signAndExecute({
+                transaction: tx.transaction,
+              });
+              return { digest: result.digest };
+            },
+            account.address,
+          );
+
+        // Sign and execute the publish_content transaction
+        const publishResult = await signAndExecute({
+          transaction: publishTx,
+        });
+
+        return { blobId, publishDigest: publishResult.digest };
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [contentService, signAndExecute, account?.address, suiClient],
   );
 
   return { upload, isPending };
@@ -156,4 +211,33 @@ export function useContentDecrypt() {
   );
 
   return { decrypt, isPending };
+}
+
+/**
+ * Hook for downloading public (unencrypted) content from Walrus.
+ */
+export function useWalrusDownload() {
+  const suiClient = useSuiClient();
+  const packageId = useNetworkVariable("packageId");
+  const platformId = useNetworkVariable("platformId");
+
+  const contentService = useMemo(
+    () =>
+      createContentService({
+        suiClient,
+        packageId,
+        platformId,
+        network: "testnet",
+      }),
+    [suiClient, packageId, platformId],
+  );
+
+  const download = useCallback(
+    async (blobId: string): Promise<Uint8Array> => {
+      return await contentService.downloadAvatar(blobId);
+    },
+    [contentService],
+  );
+
+  return { download };
 }

@@ -41,6 +41,7 @@ export class ContentService {
     this.transactionService = createTransactionService(
       config.packageId,
       config.platformId,
+      config.suiClient,
     );
   }
 
@@ -80,12 +81,15 @@ export class ContentService {
   ): Promise<{ blobId: string; publishTx: Transaction }> {
     // Step 1: Read file as bytes
     const fileBytes = new Uint8Array(await params.file.arrayBuffer());
+    console.log("🔒 SEAL: Original file size:", fileBytes.length, "bytes");
 
     // Step 2: Encrypt with SEAL
     const { encryptedObject } = await this.sealService.encrypt(
       creatorProfileId,
       fileBytes,
     );
+    console.log("🔒 SEAL: Encrypted size:", encryptedObject.length, "bytes");
+    console.log("🔒 SEAL: Using identity (creator profile ID):", creatorProfileId);
 
     // Step 3: Upload to Walrus
     const blobId = await this.walrusService.uploadEncryptedContent(
@@ -93,6 +97,7 @@ export class ContentService {
       signAndExecute,
       ownerAddress,
     );
+    console.log("🔒 SEAL: Encrypted blob uploaded to Walrus with ID:", blobId);
 
     // Step 4: Build publish_content transaction
     const publishTx = this.transactionService.buildPublishContentTx(
@@ -103,6 +108,9 @@ export class ContentService {
       blobId,
       params.contentType,
     );
+
+    // Set transaction sender (required for signing)
+    publishTx.setSender(ownerAddress);
 
     return { blobId, publishTx };
   }
@@ -126,6 +134,52 @@ export class ContentService {
 
     // Step 2: Decrypt with SEAL
     return this.sealService.decrypt(encryptedBytes, sessionKey, accessPassId);
+  }
+
+  /**
+   * Upload content WITHOUT encryption (MVP - just Walrus, no SEAL).
+   *
+   * Flow:
+   * 1. Read file bytes
+   * 2. Upload to Walrus (public, no encryption)
+   * 3. Build publish_content transaction (caller signs/executes)
+   *
+   * @returns The Walrus blob ID and the publish transaction to sign.
+   */
+  async uploadContentUnencrypted(
+    params: ContentUploadParams,
+    creatorProfileId: string,
+    creatorCapId: string,
+    signAndExecute: (tx: {
+      transaction: string;
+      options?: Record<string, unknown>;
+    }) => Promise<{ digest: string }>,
+    ownerAddress: string,
+  ): Promise<{ blobId: string; publishTx: Transaction }> {
+    // Step 1: Read file as bytes
+    const fileBytes = new Uint8Array(await params.file.arrayBuffer());
+
+    // Step 2: Upload to Walrus (public, no encryption)
+    const blobId = await this.walrusService.uploadPublicFile(
+      fileBytes,
+      signAndExecute,
+      ownerAddress,
+    );
+
+    // Step 3: Build publish_content transaction
+    const publishTx = this.transactionService.buildPublishContentTx(
+      creatorProfileId,
+      creatorCapId,
+      params.title,
+      params.description,
+      blobId,
+      params.contentType,
+    );
+
+    // Set transaction sender (required for signing)
+    publishTx.setSender(ownerAddress);
+
+    return { blobId, publishTx };
   }
 
   /**

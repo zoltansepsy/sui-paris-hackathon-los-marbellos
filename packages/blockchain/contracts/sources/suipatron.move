@@ -151,7 +151,7 @@ module suipatron::suipatron {
 
     /// Create a new creator profile with a flat access price
     #[allow(lint(self_transfer))]
-    public fun create_profile(
+    public entry fun create_profile(
         platform: &mut Platform,
         name: String,
         bio: String,
@@ -201,7 +201,7 @@ module suipatron::suipatron {
     }
 
     /// Update creator profile metadata (partial updates via Option params)
-    public fun update_profile(
+    public entry fun update_profile(
         profile: &mut CreatorProfile,
         cap: &CreatorCap,
         mut name: Option<String>,
@@ -240,7 +240,7 @@ module suipatron::suipatron {
     }
 
     /// Publish encrypted content as dynamic object field on CreatorProfile
-    public fun publish_content(
+    public entry fun publish_content(
         profile: &mut CreatorProfile,
         cap: &CreatorCap,
         title: String,
@@ -282,7 +282,7 @@ module suipatron::suipatron {
 
     /// Purchase access to a creator's content (one-time flat payment)
     #[allow(lint(self_transfer))]
-    public fun purchase_access(
+    public entry fun purchase_access(
         platform: &mut Platform,
         profile: &mut CreatorProfile,
         payment: Coin<SUI>,
@@ -327,7 +327,7 @@ module suipatron::suipatron {
     }
 
     /// Withdraw accumulated earnings from creator profile
-    public fun withdraw_earnings(
+    public entry fun withdraw_earnings(
         profile: &mut CreatorProfile,
         cap: &CreatorCap,
         clock: &Clock,

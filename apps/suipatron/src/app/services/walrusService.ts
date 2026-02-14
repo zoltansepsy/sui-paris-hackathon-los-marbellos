@@ -53,7 +53,7 @@ export class WalrusService {
   async uploadEncryptedContent(
     encryptedBytes: Uint8Array,
     signAndExecute: (tx: {
-      transaction: string;
+      transaction: any;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
@@ -72,9 +72,12 @@ export class WalrusService {
       owner: ownerAddress,
     });
 
+    // Set transaction sender (required for signing)
+    registerTx.setSender(ownerAddress);
+
     // Step 3: Sign and execute the registration transaction
     const registerResult = await signAndExecute({
-      transaction: await registerTx.toJSON(),
+      transaction: registerTx,
     });
 
     // Step 4: Wait for network sync before uploading slivers
@@ -85,8 +88,12 @@ export class WalrusService {
 
     // Step 6: Build and execute certification transaction
     const certifyTx = flow.certify();
+
+    // Set transaction sender (required for signing)
+    certifyTx.setSender(ownerAddress);
+
     await signAndExecute({
-      transaction: await certifyTx.toJSON(),
+      transaction: certifyTx,
     });
 
     // Step 7: Get the blob info
@@ -96,20 +103,56 @@ export class WalrusService {
 
   /**
    * Upload a public file directly (e.g., avatar images — no encryption).
+   * Uses the same flow as uploadEncryptedContent but without encryption.
    */
   async uploadPublicFile(
     data: Uint8Array,
-    signer: Signer,
-    ownerAddress?: string,
+    signAndExecute: (tx: {
+      transaction: any;
+      options?: Record<string, unknown>;
+    }) => Promise<{ digest: string }>,
+    ownerAddress: string,
   ): Promise<string> {
     const client = this.ensureClient();
-    const result = await client.writeBlob({
-      blob: data,
-      deletable: false,
+
+    const flow = client.writeBlobFlow({ blob: data });
+
+    // Step 1: Encode the blob
+    await flow.encode();
+
+    // Step 2: Build registration transaction
+    const registerTx = flow.register({
       epochs: WALRUS_DEFAULT_EPOCHS,
-      signer,
+      deletable: false,
       owner: ownerAddress,
     });
+
+    // Set transaction sender (required for signing)
+    registerTx.setSender(ownerAddress);
+
+    // Step 3: Sign and execute the registration transaction
+    const registerResult = await signAndExecute({
+      transaction: registerTx,
+    });
+
+    // Step 4: Wait for network sync
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+    // Step 5: Upload slivers
+    await flow.upload({ digest: registerResult.digest });
+
+    // Step 6: Build and execute certification transaction
+    const certifyTx = flow.certify();
+
+    // Set transaction sender (required for signing)
+    certifyTx.setSender(ownerAddress);
+
+    await signAndExecute({
+      transaction: certifyTx,
+    });
+
+    // Step 7: Get the blob info
+    const result = await flow.getBlob();
     return result.blobId;
   }
 

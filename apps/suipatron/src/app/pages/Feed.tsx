@@ -4,11 +4,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useMyAccessPasses } from "../hooks/useAccessPass";
-import { useCreatorProfile, useContentList } from "../hooks/useCreator";
-import {
-  creatorProfileToCreator,
-  onchainContentToContent,
-} from "../lib/adapters";
+import { useCreatorProfilesByIds, useCreatorProfiles, useContentList } from "../hooks/useCreator";
+import { creatorProfileToCreator, onchainContentToContent } from "../lib/adapters";
 import { LoadingState } from "../components/LoadingState";
 import {
   Card,
@@ -20,7 +17,6 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { ContentCard } from "../components/ContentCard";
-import { mockCreators, mockContent } from "../lib/mock-data";
 import type { Creator, Content } from "@/shared/types/creator.types";
 import { Heart } from "lucide-react";
 
@@ -60,20 +56,59 @@ export function Feed() {
     ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
     : [];
 
-  // Fall back to mock data when no on-chain passes
-  const supportedCreators: Creator[] =
-    supportedCreatorIds.length > 0
-      ? [] // Will be populated from on-chain data in future iteration
-      : mockCreators.filter((c) => false); // No mock fallback for feed
+  // Fetch the actual creator profiles for supported creators
+  const {
+    data: onchainCreatorProfiles,
+    isLoading: creatorsLoading,
+  } = useCreatorProfilesByIds(
+    supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
+  );
+
+  // Convert on-chain profiles to UI Creator type
+  const supportedCreators: Creator[] = onchainCreatorProfiles
+    ? onchainCreatorProfiles.map(creatorProfileToCreator)
+    : [];
+
+  // Fetch all creators to find the most supported one (for empty state)
+  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } = useCreatorProfiles();
+
+  // Find the most supported creator
+  const mostSupportedCreator = allCreatorProfiles
+    ? allCreatorProfiles.reduce((max, current) =>
+        current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
+        allCreatorProfiles[0]
+      )
+    : null;
+
+  // Fetch content for the most supported creator (for empty state)
+  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } = useContentList(
+    mostSupportedCreator?.objectId
+  );
 
   // For now, use supportedCreatorIds to show creator links
   const feedContent: (Content & { creator: Creator })[] = [];
 
-  if (passesLoading) {
+  if (passesLoading || creatorsLoading) {
     return <LoadingState />;
   }
 
   if (supportedCreators.length === 0) {
+    // Show loading while fetching the most supported creator
+    if (allCreatorsLoading || mostSupportedContentLoading) {
+      return <LoadingState />;
+    }
+
+    // Convert most supported creator's content to UI format
+    const previewContent = mostSupportedContent && mostSupportedCreator
+      ? mostSupportedContent.map((c) =>
+          onchainContentToContent(c, mostSupportedCreator.objectId, false)
+        )
+      : [];
+
+    const previewCreator = mostSupportedCreator
+      ? creatorProfileToCreator(mostSupportedCreator)
+      : null;
+
     return (
       <div className="flex flex-col min-h-screen">
         <section className="py-12 px-4 border-b bg-muted/30">
@@ -85,23 +120,64 @@ export function Feed() {
           </div>
         </section>
 
-        <section className="flex-1 flex items-center justify-center px-4 py-12">
-          <Card className="max-w-md w-full text-center">
-            <CardContent className="pt-6 space-y-4">
-              <Heart className="h-16 w-16 text-muted-foreground mx-auto" />
-              <div>
-                <h3 className="font-semibold text-lg mb-2">
-                  No supported creators yet
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Support a creator to see their content in your feed
-                </p>
+        <section className="flex-1 px-4 py-12">
+          <div className="container mx-auto max-w-6xl space-y-8">
+            <Card className="text-center">
+              <CardContent className="pt-6 space-y-4">
+                <Heart className="h-16 w-16 text-muted-foreground mx-auto" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">
+                    No supported creators yet
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Support a creator to unlock their content
+                  </p>
+                </div>
+                <Link href="/explore">
+                  <Button>Explore Creators</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Show most supported creator's content (locked) */}
+            {previewCreator && previewContent.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold">
+                    Popular Content from {previewCreator.name}
+                  </h2>
+                  <Link href={`/creator/${previewCreator.id}`}>
+                    <Button variant="outline">View Creator</Button>
+                  </Link>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {previewContent.map((content) => (
+                    <Link
+                      key={content.id}
+                      href={`/creator/${previewCreator.id}`}
+                      className="space-y-3"
+                    >
+                      <ContentCard
+                        content={content}
+                        isLocked={true}
+                        blobId={(content as any).blobId}
+                      />
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="text-center pt-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Support {previewCreator.name} for {previewCreator.price} SUI to unlock all content
+                  </p>
+                  <Link href={`/creator/${previewCreator.id}`}>
+                    <Button>Support Creator</Button>
+                  </Link>
+                </div>
               </div>
-              <Link href="/explore">
-                <Button>Explore Creators</Button>
-              </Link>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </section>
       </div>
     );

@@ -9,6 +9,7 @@
  */
 
 import { Transaction } from "@mysten/sui/transactions";
+import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { CLOCK_OBJECT_ID } from "../constants";
 import type { ProfileUpdateParams } from "../types/onchain";
 
@@ -16,6 +17,7 @@ export class TransactionService {
   constructor(
     private packageId: string,
     private platformId: string,
+    private suiClient?: SuiJsonRpcClient,
   ) {}
 
   /**
@@ -151,6 +153,7 @@ export class TransactionService {
 export function createTransactionService(
   packageId: string,
   platformId: string,
+  suiClient?: SuiJsonRpcClient,
 ): TransactionService {
-  return new TransactionService(packageId, platformId);
+  return new TransactionService(packageId, platformId, suiClient);
 }
