@@ -17,7 +17,8 @@ const SUI_TO_MIST = 1e9;
 
 export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
   const account = useCurrentAccount();
-  const { user, updateUser } = useAuth();
+  const { user, walletAddress, updateUser } = useAuth();
+  const sender = account?.address ?? walletAddress ?? null;
   const { createProfile, isPending } = useSuiPatronTransactions();
   const [name, setName] = useState(user?.name || "");
   const [bio, setBio] = useState("");
@@ -105,10 +106,10 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
           One-time payment for permanent access to all your content
         </p>
       </div>
-      {!account ? (
+      {!sender ? (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Connect your wallet to create a creator profile.
+            Sign in or connect your wallet to create a creator profile.
           </p>
           <ConnectButton connectText="Connect Wallet" />
         </div>

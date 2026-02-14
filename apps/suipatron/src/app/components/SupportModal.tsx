@@ -34,7 +34,8 @@ interface SupportModalProps {
 export function SupportModal(props: SupportModalProps) {
   const { creator, open, onOpenChange, onSuccess } = props;
   const account = useCurrentAccount();
-  const { user } = useAuth();
+  const { user, walletAddress } = useAuth();
+  const sender = account?.address ?? walletAddress ?? null;
   const addressForStorage = account?.address ?? user?.id;
   const { addAccessPass } = useAccessPasses(addressForStorage);
   const router = useRouter();
@@ -126,8 +127,8 @@ export function SupportModal(props: SupportModalProps) {
           >
             Cancel
           </Button>
-          {!account ? (
-            <ConnectButton connectText="Connect Wallet to Support" />
+          {!sender ? (
+            <ConnectButton connectText="Sign in or Connect Wallet" />
           ) : (
             <Button
               onClick={handleSupport}

@@ -16,6 +16,7 @@ import {
   enokiApiKey,
   googleClientId,
   enokiNetwork,
+  EnokiFlowContext,
 } from "./enoki-provider";
 
 interface AuthContextType {
@@ -144,15 +145,31 @@ function WalletAuthProviderInner({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Provides Enoki flow to context so hooks can use zkLogin signing when configured. */
+function EnokiFlowContextProvider({ children }: { children: React.ReactNode }) {
+  const enoki = useEnokiFlow();
+  return (
+    <EnokiFlowContext.Provider value={enoki}>
+      {children}
+    </EnokiFlowContext.Provider>
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (isEnokiConfigured) {
     return (
       <EnokiFlowProvider apiKey={enokiApiKey}>
-        <EnokiAuthProviderInner>{children}</EnokiAuthProviderInner>
+        <EnokiFlowContextProvider>
+          <EnokiAuthProviderInner>{children}</EnokiAuthProviderInner>
+        </EnokiFlowContextProvider>
       </EnokiFlowProvider>
     );
   }
-  return <WalletAuthProviderInner>{children}</WalletAuthProviderInner>;
+  return (
+    <EnokiFlowContext.Provider value={null}>
+      <WalletAuthProviderInner>{children}</WalletAuthProviderInner>
+    </EnokiFlowContext.Provider>
+  );
 }
 
 export function useAuth() {

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { createContext, useContext } from "react";
 import { EnokiFlowProvider, useEnokiFlow } from "@mysten/enoki/react";
 
 const ENOKI_API_KEY =
@@ -26,6 +27,15 @@ export const enokiNetwork: "mainnet" | "testnet" | "devnet" =
   rawNetwork === "devnet"
     ? rawNetwork
     : "testnet";
+
+/** Optional Enoki flow: null when Enoki not configured (wallet-only mode). Use for zkLogin tx signing. */
+export const EnokiFlowContext = createContext<ReturnType<
+  typeof useEnokiFlow
+> | null>(null);
+
+export function useEnokiFlowOptional() {
+  return useContext(EnokiFlowContext);
+}
 
 export function EnokiProvider({ children }: { children: React.ReactNode }) {
   if (!isEnokiConfigured) {

@@ -48,7 +48,8 @@ function contentTypeFromFile(file: File): ContentType {
 
 export function Dashboard() {
   const account = useCurrentAccount();
-  const { user, updateUser } = useAuth();
+  const { user, walletAddress, updateUser } = useAuth();
+  const sender = account?.address ?? walletAddress ?? null;
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
@@ -275,11 +276,11 @@ export function Dashboard() {
 
       <section className="py-12 px-4 flex-1">
         <div className="container mx-auto space-y-8">
-          {!account && (
+          {!sender && (
             <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                Connect your wallet to save profile changes, upload content, or
-                withdraw earnings.
+                Sign in or connect your wallet to save profile changes, upload
+                content, or withdraw earnings.
               </p>
               <ConnectButton connectText="Connect Wallet" />
             </div>
@@ -340,7 +341,7 @@ export function Dashboard() {
                   onClick={() =>
                     isEditing ? handleSaveProfile() : setIsEditing(true)
                   }
-                  disabled={!account || isSaving}
+                  disabled={!sender || isSaving}
                 >
                   {isSaving ? (
                     <>
@@ -431,7 +432,7 @@ export function Dashboard() {
                 </div>
                 <Button
                   onClick={() => setShowUploadModal(true)}
-                  disabled={!account}
+                  disabled={!sender}
                 >
                   <FileUp className="mr-2 h-4 w-4" />
                   Add Content
@@ -461,7 +462,7 @@ export function Dashboard() {
                   </div>
                   <Button
                     onClick={() => setShowUploadModal(true)}
-                    disabled={!account}
+                    disabled={!sender}
                   >
                     Add Content
                   </Button>

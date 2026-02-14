@@ -25,7 +25,8 @@ export function WithdrawButton({
   className,
 }: WithdrawButtonProps) {
   const account = useCurrentAccount();
-  const { user, updateUser } = useAuth();
+  const { user, walletAddress, updateUser } = useAuth();
+  const sender = account?.address ?? walletAddress ?? null;
   const { withdrawEarnings, isPending } = useSuiPatronTransactions();
 
   const profileId = user?.creatorProfile?.profileId;
@@ -65,7 +66,7 @@ export function WithdrawButton({
       size={size}
       className={className}
       onClick={handleWithdraw}
-      disabled={!account || isPending}
+      disabled={!sender || isPending}
     >
       {isPending ? (
         <>

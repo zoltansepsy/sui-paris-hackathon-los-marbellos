@@ -7,15 +7,16 @@ import {
   useCurrentAccount,
   useSignPersonalMessage,
 } from "@mysten/dapp-kit";
+import { toBase64 } from "@mysten/bcs";
 import { useNetworkVariable } from "@hack/blockchain/sdk/networkConfig";
 import { createContentService } from "../services/contentService";
 import type { ContentUploadParams } from "../types/onchain";
 import type { SessionKey } from "@mysten/seal";
 import type { Transaction } from "@mysten/sui/transactions";
 import { useAuth } from "../lib/auth-context";
-import { useEnokiFlow } from "../lib/enoki-provider";
+import { useEnokiFlow, useEnokiFlowOptional } from "../lib/enoki-provider";
 import { isEnokiConfigured } from "../lib/enoki-provider";
-import { buildPublishContentTx } from "../lib/ptb";
+import { executeWithEnokiKeypair } from "../lib/enoki-execute";
 
 /**
  * Hook for uploading encrypted content.
@@ -82,14 +83,20 @@ export function useContentUpload() {
 
 /**
  * Hook for uploading unencrypted content (MVP - Walrus only, no SEAL).
- * Wallet-only: requires connected wallet for Walrus steps and publish_content.
+ * Uses connected wallet or zkLogin (Enoki keypair) for Walrus steps and publish_content.
  */
 export function useContentUploadUnencrypted() {
   const suiClient = useSuiClient();
   const packageId = useNetworkVariable("packageId");
   const platformId = useNetworkVariable("platformId");
   const account = useCurrentAccount();
+  const { walletAddress } = useAuth();
+  const enoki = useEnokiFlowOptional();
   const [isPending, setIsPending] = useState(false);
+
+  const sender = account?.address ?? walletAddress ?? null;
+  const useZkLogin =
+    !account?.address && !!walletAddress && !!enoki && isEnokiConfigured;
 
   const contentService = useMemo(
     () =>
@@ -104,21 +111,52 @@ export function useContentUploadUnencrypted() {
 
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
+  const signWithEnoki = useCallback(
+    async (bytes: Uint8Array) => {
+      if (!enoki) throw new Error("Enoki not available");
+      const keypair = await enoki.getKeypair();
+      const result = await keypair.signTransaction(bytes);
+      const sig =
+        typeof result.signature === "string"
+          ? result.signature
+          : toBase64(result.signature as Uint8Array);
+      return { signature: sig };
+    },
+    [enoki],
+  );
+
+  const executeZk = useCallback(
+    async (tx: Transaction) => {
+      if (!walletAddress) throw new Error("Sign in to continue");
+      return await executeWithEnokiKeypair({
+        tx,
+        sender: walletAddress,
+        signTransaction: signWithEnoki,
+      });
+    },
+    [walletAddress, signWithEnoki],
+  );
+
   const upload = useCallback(
     async (
       params: ContentUploadParams,
       creatorProfileId: string,
       creatorCapId: string,
     ) => {
-      if (!account?.address) {
-        throw new Error("Connect wallet to upload content");
+      if (!sender) {
+        throw new Error("Sign in or connect wallet to upload content");
       }
 
       const signAndExecuteForWalrus = async (tx: {
         transaction: unknown;
       }): Promise<{ digest: string }> => {
+        const transaction = tx.transaction as Transaction;
+        if (useZkLogin) {
+          const result = await executeZk(transaction);
+          return { digest: result.digest };
+        }
         const result = await signAndExecute({
-          transaction: tx.transaction as Transaction,
+          transaction,
         });
         return { digest: result.digest };
       };
@@ -131,9 +169,13 @@ export function useContentUploadUnencrypted() {
             creatorProfileId,
             creatorCapId,
             signAndExecuteForWalrus,
-            account.address,
+            sender,
           );
 
+        if (useZkLogin) {
+          const publishResult = await executeZk(publishTx);
+          return { blobId, publishDigest: publishResult.digest };
+        }
         const publishResult = await signAndExecute({
           transaction: publishTx,
         });
@@ -142,7 +184,7 @@ export function useContentUploadUnencrypted() {
         setIsPending(false);
       }
     },
-    [contentService, signAndExecute, account?.address],
+    [contentService, signAndExecute, sender, useZkLogin, executeZk],
   );
 
   return { upload, isPending };
