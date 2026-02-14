@@ -222,6 +222,40 @@ Full service layer for the Creator Registry (handle→profile lookups). On branc
 **Validation:**
 - `handleSchema` + `parseHandle()` in `src/shared/validation/registry.schema.ts`
 
+### Service Layer — One-Time Tips & Platform Fees
+
+Full service layer for tips and platform fee management. On branch `zoltan/phase-2`.
+
+**Type definitions:**
+- `IndexedTip` added to `src/app/lib/indexer/types.ts` — `{ profileId, tipper, totalAmount, creatorAmount, platformFee, timestamp }`
+- `IndexerStore` interface extended with `addTip`, `getTipsByProfile`, `getTipsByTipper`
+
+**Indexer store implementations:**
+- In-memory store (`store.ts`): dual `Map` storage — `tipsByProfile` and `tipsByTipper` with `ensureTipListByProfile`/`ensureTipListByTipper` helpers
+- Supabase store (`store-supabase.ts`): `TipRow` type, `rowToTip` converter, `indexer_tips` table operations (insert, query by profile desc, query by tipper desc)
+- New migration: `supabase/migrations/20250214300000_add_tips.sql` — `indexer_tips` table with `BIGSERIAL` PK, indexes on `(profile_id, timestamp DESC)` and `(tipper, timestamp DESC)`
+
+**Indexer event processing** (`src/app/lib/indexer/run.ts`):
+- `TipReceived` handler now stores tips (previously logged but skipped)
+- Extracts `profile_id`, `tipper`, `total_amount`, `creator_amount`, `platform_fee`, `timestamp` → calls `store.addTip()`
+
+**Tips service** (`src/app/lib/services/tips.ts` — new):
+- `getTipsByProfile(profileId)` — returns all tips for a creator, throws `CreatorNotFoundError` if creator missing
+- `getTipsByTipper(tipper)` — returns all tips sent by an address
+
+**Platform service** (`src/app/lib/services/platform.ts` — new):
+- `getPlatformConfig()` — reads Platform shared object on-chain via SUI client
+- Returns `{ feeBps, treasuryBalance, totalCreators, totalAccessPasses }`
+- Parses `Balance<SUI>` treasury field and `platform_fee_bps`
+
+**API routes:**
+- `GET /api/creator/:id/tips` (`src/app/api/creator/[id]/tips/route.ts` — new) — returns `{ tips: IndexedTip[] }`, 404 if creator not found
+- `GET /api/platform` (`src/app/api/platform/route.ts` — new) — returns current fee config + stats from on-chain Platform object
+
+**PTB builders** (`src/app/lib/ptb/index.ts`):
+- `buildSetPlatformFeeTx(adminCapId, feeBps)` — admin-only, sets fee in basis points (0–10000)
+- `buildWithdrawPlatformFeesTx(adminCapId)` — admin-only, withdraws platform treasury
+
 ### Documentation
 
 | File | Description |
@@ -278,6 +312,8 @@ After publishing, record:
 - [x] Event indexer — poll SUI events, build queryable state — **apps/suipatron**: `src/app/lib/indexer/` (store, run, types); trigger via `GET /api/events` (cron)
 - [x] **Indexer store: Supabase** — Persistent store when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set; otherwise in-memory (dev). **apps/suipatron**: `src/app/lib/indexer/store-supabase.ts`, `get-store.ts`; schema in `supabase/migrations/20250214000000_indexer_tables.sql`. See `docs/suipatron/INDEXER-SUPABASE-ANALYSIS.md`.
 - [x] `GET /api/registry/:handle` — resolve creator handle to profile + content — **apps/suipatron**: `src/app/api/registry/[handle]/route.ts`
+- [x] `GET /api/creator/:id/tips` — list tips received by a creator — **apps/suipatron**: `src/app/api/creator/[id]/tips/route.ts`
+- [x] `GET /api/platform` — current platform fee config + stats (on-chain read) — **apps/suipatron**: `src/app/api/platform/route.ts`
 
 ### 5. Integration Hooks / Services (P3–P14)
 
@@ -291,6 +327,8 @@ PTB builders (transaction construction) — **Updated for Phase 2 API:**
 - [x] `buildTipTx(profileId, amountMist)` — sends one-time tip
 - [x] `buildRenewSubscriptionTx(profileId, accessPassId, priceMist)` — renews subscription
 - [x] `buildRegisterHandleTx(profileId, creatorCapId, handle)` — registers creator handle
+- [x] `buildSetPlatformFeeTx(adminCapId, feeBps)` — admin: sets platform fee in basis points
+- [x] `buildWithdrawPlatformFeesTx(adminCapId)` — admin: withdraws platform treasury
 
 SEAL integration — **Updated for Phase 2 identity format:**
 - [ ] `encryptContent(data, creatorProfileId, minTierLevel, packageId)` — SEAL encrypt with 40-byte identity (32-byte ID + 8-byte LE tier level)
@@ -614,4 +652,4 @@ cd apps/suipatron && pnpm dev
 
 ---
 
-*Last updated: Subscription Tiers frontend completion on branch `zoltan/phase-2`. Added renewal UI (SupportModal renewMode), expiry display (subscription-utils.ts), expiry-aware access banners (CreatorProfile green/amber/red), ContentCard expiry badges, Feed expiry filtering, CreateProfileForm duration selector, accessPassId tracking in access-pass hook, getAccessPassIdFromTx utility, indexer SubscriptionRenewed event persistence (both stores + migration). Previous: Creator Registry service layer, Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*
+*Last updated: One-Time Tips & Platform Fees service layer added on branch `zoltan/phase-2`. IndexedTip type, both stores (in-memory + Supabase), indexer TipReceived event persistence, tips service (getTipsByProfile, getTipsByTipper), platform service (getPlatformConfig — on-chain reads), API routes (GET /api/creator/:id/tips, GET /api/platform), admin PTB builders (buildSetPlatformFeeTx, buildWithdrawPlatformFeesTx), Supabase migration (indexer_tips table). Previous: Subscription Tiers frontend, Creator Registry service layer, Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*

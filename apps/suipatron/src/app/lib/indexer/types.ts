@@ -51,6 +51,15 @@ export interface IndexedHandle {
   registeredAt: number;
 }
 
+export interface IndexedTip {
+  profileId: string; // creator who received the tip
+  tipper: string; // address of the tipper
+  totalAmount: number; // total tip amount in MIST
+  creatorAmount: number; // amount after platform fee
+  platformFee: number; // platform fee portion
+  timestamp: number;
+}
+
 /** Cursor-based pagination for GET /api/creators */
 export interface CreatorsPage {
   creators: IndexedCreator[];
@@ -77,6 +86,9 @@ export interface IndexerStore {
     accessPassId: string,
     newExpiresAt: number,
   ): Promise<void>;
+  addTip(tip: IndexedTip): Promise<void>;
+  getTipsByProfile(profileId: string): Promise<IndexedTip[]>;
+  getTipsByTipper(tipper: string): Promise<IndexedTip[]>;
   getLastCursor(eventType: string): Promise<string | undefined>;
   setLastCursor(eventType: string, cursor: string): Promise<void>;
 }

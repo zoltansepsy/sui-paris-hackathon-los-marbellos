@@ -10,6 +10,7 @@ import type {
   IndexedContent,
   IndexedAccessPurchase,
   IndexedHandle,
+  IndexedTip,
   IndexedTier,
 } from "./types";
 
@@ -51,6 +52,15 @@ type HandleRow = {
   handle: string;
   profile_id: string;
   registered_at: number;
+};
+
+type TipRow = {
+  profile_id: string;
+  tipper: string;
+  total_amount: number;
+  creator_amount: number;
+  platform_fee: number;
+  timestamp: number;
 };
 
 function parseTiersJson(raw: unknown): IndexedTier[] {
@@ -138,6 +148,17 @@ function rowToHandle(r: HandleRow): IndexedHandle {
     handle: r.handle,
     profileId: r.profile_id,
     registeredAt: Number(r.registered_at),
+  };
+}
+
+function rowToTip(r: TipRow): IndexedTip {
+  return {
+    profileId: r.profile_id,
+    tipper: r.tipper,
+    totalAmount: Number(r.total_amount),
+    creatorAmount: Number(r.creator_amount),
+    platformFee: Number(r.platform_fee),
+    timestamp: Number(r.timestamp),
   };
 }
 
@@ -315,6 +336,38 @@ export function createSupabaseStore(): IndexerStore {
         .from("indexer_access_purchases")
         .update({ expires_at: newExpiresAt })
         .eq("access_pass_id", accessPassId);
+    },
+
+    async addTip(tip: IndexedTip) {
+      const supabase = getClient();
+      await supabase.from("indexer_tips").insert({
+        profile_id: tip.profileId,
+        tipper: tip.tipper,
+        total_amount: tip.totalAmount,
+        creator_amount: tip.creatorAmount,
+        platform_fee: tip.platformFee,
+        timestamp: tip.timestamp,
+      });
+    },
+
+    async getTipsByProfile(profileId: string): Promise<IndexedTip[]> {
+      const supabase = getClient();
+      const { data } = await supabase
+        .from("indexer_tips")
+        .select("*")
+        .eq("profile_id", profileId)
+        .order("timestamp", { ascending: false });
+      return (data ?? []).map((r: TipRow) => rowToTip(r));
+    },
+
+    async getTipsByTipper(tipper: string): Promise<IndexedTip[]> {
+      const supabase = getClient();
+      const { data } = await supabase
+        .from("indexer_tips")
+        .select("*")
+        .eq("tipper", tipper)
+        .order("timestamp", { ascending: false });
+      return (data ?? []).map((r: TipRow) => rowToTip(r));
     },
 
     async getLastCursor(eventType: string): Promise<string | undefined> {

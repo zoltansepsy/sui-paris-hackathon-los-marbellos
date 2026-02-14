@@ -9,6 +9,7 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedTip,
   IndexedTier,
 } from "./types";
 
@@ -311,6 +312,17 @@ export async function runIndexer(): Promise<{
               registeredAt: num(pick(parsed, "timestamp")),
             });
             processed++;
+          } else if (eventType === "TipReceived") {
+            const tip: IndexedTip = {
+              profileId: str(pick(parsed, "profile_id")),
+              tipper: str(pick(parsed, "tipper")),
+              totalAmount: num(pick(parsed, "total_amount")),
+              creatorAmount: num(pick(parsed, "creator_amount")),
+              platformFee: num(pick(parsed, "platform_fee")),
+              timestamp: num(pick(parsed, "timestamp")),
+            };
+            await store.addTip(tip);
+            processed++;
           } else if (eventType === "SubscriptionRenewed") {
             const accessPassId = str(pick(parsed, "access_pass_id"));
             const newExpiresAt = num(pick(parsed, "new_expires_at"));
@@ -319,7 +331,7 @@ export async function runIndexer(): Promise<{
             }
             processed++;
           }
-          // EarningsWithdrawn, TipReceived: logged but no store update needed
+          // EarningsWithdrawn: logged but no store update needed
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           errors.push(`${eventType} ${id}: ${msg}`);

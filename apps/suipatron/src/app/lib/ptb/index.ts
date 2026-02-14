@@ -299,3 +299,49 @@ export function buildRegisterHandleTx(
 
   return tx;
 }
+
+/**
+ * Build set_platform_fee transaction (admin only).
+ * Sets the platform fee in basis points (0–10000, where 250 = 2.5%).
+ */
+export function buildSetPlatformFeeTx(
+  adminCapId: string,
+  feeBps: number,
+): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+  const platform = getPlatformId();
+
+  tx.moveCall({
+    target: `${pkg}::suipatron::set_platform_fee`,
+    arguments: [
+      tx.object(platform),
+      tx.object(adminCapId),
+      tx.pure.u64(feeBps),
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build withdraw_platform_fees transaction (admin only).
+ * Withdraws accumulated platform treasury to the admin address.
+ */
+export function buildWithdrawPlatformFeesTx(adminCapId: string): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+  const platform = getPlatformId();
+
+  tx.moveCall({
+    target: `${pkg}::suipatron::withdraw_platform_fees`,
+    arguments: [
+      tx.object(platform),
+      tx.object(adminCapId),
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
