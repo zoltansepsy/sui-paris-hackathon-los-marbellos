@@ -22,12 +22,6 @@ import path from "path";
 /** App configs: base path, lib path, api path, ts glob for any-check */
 const APP_CONFIGS = [
   {
-    name: "dapp",
-    lib: "apps/dapp/lib",
-    api: "apps/dapp/app/api",
-    tsGlob: "apps/dapp/**/*.{ts,tsx}",
-  },
-  {
     name: "suipatron",
     lib: "apps/suipatron/src/app/lib",
     api: "apps/suipatron/src/app/api",

@@ -2,7 +2,7 @@
   "name": "sui-paris-hack",
   "version": "0.1.0",
   "private": true,
-  "description": "SUI Paris Hack 24h - dApp skeleton",
+  "description": "SUI Paris Hack 24h - SuiPatron",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -16,10 +16,6 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "lint-staged": {
-    "apps/dapp/**/*.{ts,tsx}": [
-      "cd apps/dapp && eslint --fix --config eslint.config.mjs",
-      "prettier --write"
-    ],
     "apps/suipatron/**/*.{ts,tsx}": [
       "cd apps/suipatron && eslint --fix --config eslint.config.mjs",
       "prettier --write"
