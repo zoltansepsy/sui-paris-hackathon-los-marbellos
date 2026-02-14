@@ -20,10 +20,10 @@
 
 | What            | Location                          |
 |-----------------|-----------------------------------|
-| dApp UI/pages   | `apps/dapp/app/`                  |
-| API routes      | `apps/dapp/app/api/`              |
-| Services        | `apps/dapp/lib/services/` (by feature, e.g. `orders/`, `nft/`) |
-| Shared types    | `packages/types` or `apps/dapp/lib/shared/types/` |
+| App UI/pages    | `apps/suipatron/src/app/`         |
+| API routes      | `apps/suipatron/src/app/api/`     |
+| Services        | `apps/suipatron/src/app/lib/services/` (by feature, e.g. `orders/`, `nft/`) |
+| Shared types    | `packages/types` or `apps/suipatron` shared types |
 | Shared UI       | `packages/ui`                     |
 | Move contracts  | `packages/blockchain/contracts/sources/` |
 | Network config  | `packages/blockchain/sdk/networkConfig.ts` |
@@ -42,9 +42,9 @@
 
 These rules are checked by `pnpm check:patterns`. Follow them so commits don’t fail.
 
-- **Services:** Export **functions** (Phase 1), not only classes. Put them under `apps/dapp/lib/services/<feature>/`.
+- **Services:** Export **functions** (Phase 1), not only classes. Put them under `apps/suipatron/src/app/lib/services/<feature>/`.
 - **API routes:** Call **service functions** from `@/lib/services/`. Do **not** call Supabase or other DB clients directly in route handlers.
-- **Types:** Put shared types in `@hack/types` or `apps/dapp/lib/shared/types/`. Avoid defining them inline in service files.
+- **Types:** Put shared types in `@hack/types` or apps/suipatron shared types. Avoid defining them inline in service files.
 - **No `any`:** Use proper types or `unknown`. To allow an exception, add `// ALLOWED` on that line or the next.
 - **Error handling:** Service functions that do async work should use try/catch or throw custom errors.
 - **Function size:** Keep service functions under ~100 lines; split or extract helpers if longer.

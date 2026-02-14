@@ -6,21 +6,21 @@ Pre-commit hooks run on every `git commit`. Do not skip them with `--no-verify`.
 
 Runs only on **staged** files:
 
-- **apps/**/*.{ts,tsx}**: ESLint (from apps/dapp) + Prettier
+- **apps/suipatron/**/*.{ts,tsx}**: ESLint + Prettier
 - **\*.{ts,tsx}**: Prettier
 - **\*.{json,md,yml,yaml}**: Prettier
 - **packages/blockchain/**/*.move**: `sui move format --check` (if the SUI CLI supports it; otherwise the step is skipped)
 
 ## 2. Type-check
 
-`pnpm type-check` runs TypeScript across all workspace packages (@hack/blockchain, @hack/dapp, @hack/types, @hack/ui).
+`pnpm type-check` runs TypeScript across all workspace packages (e.g. @hack/blockchain, suipatron, @hack/types, @hack/ui).
 
 ## 3. Architecture pattern checks
 
 `pnpm check:patterns` runs [tools/scripts/check-patterns.ts](tools/scripts/check-patterns.ts). It enforces:
 
-- **Service pattern**: Services under `apps/dapp/lib/services/` should export functions (Phase 1), not only classes.
-- **Separation of concerns**: API routes under `apps/dapp/app/api/` should use service functions, not direct Supabase/DB calls.
+- **Service pattern**: Services under `apps/suipatron/src/app/lib/services/` should export functions (Phase 1), not only classes.
+- **Separation of concerns**: API routes under `apps/suipatron/src/app/api/` should use service functions, not direct Supabase/DB calls.
 - **Type organization**: Types used by services should live in shared types (`@hack/types` or `lib/shared/types`), not inline in service files.
 - **Error handling**: Service functions should include error handling (try/catch or custom errors).
 - **Type safety**: No `any` types in app code (use `unknown` or proper types; `// ALLOWED` on the line or next line to bypass if needed).

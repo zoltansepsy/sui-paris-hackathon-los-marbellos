@@ -16,13 +16,13 @@ Use this list when the hackathon starts so you only run and verify—no structur
 ## Move
 
 - [ ] `pnpm --filter @hack/blockchain build:contracts` succeeds (if you see "active environment not present in Move.toml", run `sui client switch --env testnet` and try again)
-- [ ] Decide network (e.g. testnet): set `defaultNetwork` in `apps/dapp/app/providers.tsx` and optionally `NEXT_PUBLIC_SUI_NETWORK` in `apps/dapp/.env.local`
+- [ ] Decide network (e.g. testnet): set `defaultNetwork` in `apps/suipatron` providers and optionally `NEXT_PUBLIC_SUI_NETWORK` in `apps/suipatron/.env.local`
 - [ ] (When ready) Deploy: `cd packages/blockchain/contracts && sui client publish --gas-budget 100000000`; save Package ID and any object IDs
 - [ ] Add deployed IDs to `packages/blockchain/sdk/networkConfig.ts` under the right network’s `variables`
 
-## dApp
+## App
 
-- [ ] `pnpm dev` (or `pnpm --filter @hack/dapp dev`) runs; app loads at http://localhost:3000
+- [ ] `pnpm dev` (or `pnpm --filter suipatron dev`) runs; app loads at http://localhost:3000
 - [ ] Connect wallet (Sui Wallet / dapp-kit ConnectButton); switch network if needed
 - [ ] One successful read or write to your contract (after deployment) so the full stack is proven
 

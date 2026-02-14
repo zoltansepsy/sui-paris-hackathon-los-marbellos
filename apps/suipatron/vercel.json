@@ -3,5 +3,11 @@
   "deploymentProtection": {
     "production": "none",
     "preview": "none"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/events",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
