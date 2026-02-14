@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
 import {
@@ -99,15 +99,42 @@ export function Dashboard() {
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  useEffect(() => {
+  // User is a creator if they have an on-chain profile or the mock flag is set
+  const isCreator = !!myProfile || !!user?.isCreator;
+
+  // Memoized computed values
+  const userContent = useMemo(
+    () =>
+      onchainContent && onchainContent.length > 0
+        ? onchainContent.map((c) =>
+            onchainContentToContent(c, myProfile?.objectId || user?.id || "", true),
+          )
+        : mockContent.filter((c) => c.creatorId === (user?.id || "")),
+    [onchainContent, myProfile?.objectId, user?.id],
+  );
+
+  const displayBalance = useMemo(
+    () =>
+      myProfile
+        ? myProfile.balance / MIST_PER_SUI
+        : user?.creatorProfile?.balance || 0,
+    [myProfile, user?.creatorProfile?.balance],
+  );
+
+  const displaySupporters = useMemo(
+    () =>
+      myProfile
+        ? myProfile.totalSupporters
+        : user?.creatorProfile?.supporterCount || 0,
+    [myProfile, user?.creatorProfile?.supporterCount],
+  );
+
+  // Event handlers
+  const handleBecomeCreator = useCallback(async () => {
     if (!user) {
-      router.push("/?signin=true");
+      toast.error("Please sign in first");
+      return;
     }
-  }, [user, router]);
-
-  if (!user) return null;
-
-  const handleBecomeCreator = async () => {
     if (!walletAddress) {
       toast.error("Please connect your wallet to become a creator");
       return;
@@ -115,7 +142,7 @@ export function Dashboard() {
 
     try {
       const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
-      await createProfile(name || user!.name, bio, priceInMist);
+      await createProfile(name || user.name, bio, priceInMist);
 
       // Invalidate all creator-related queries so they refetch
       queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
@@ -129,9 +156,14 @@ export function Dashboard() {
         error instanceof Error ? error.message : "Failed to create profile",
       );
     }
-  };
+  }, [walletAddress, price, name, user, bio, createProfile, queryClient]);
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = useCallback(async () => {
+    if (!user) {
+      toast.error("Please sign in first");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -149,7 +181,7 @@ export function Dashboard() {
         updateUser({
           name,
           creatorProfile: {
-            ...user!.creatorProfile,
+            ...user.creatorProfile,
             bio,
             price: parseFloat(price) || 5,
           },
@@ -164,9 +196,9 @@ export function Dashboard() {
 
     setIsSaving(false);
     setIsEditing(false);
-  };
+  }, [user, walletAddress, myProfile, myCreatorCap, price, name, bio, updateProfile, queryClient, updateUser]);
 
-  const handleClaimSuiNS = async () => {
+  const handleClaimSuiNS = useCallback(async () => {
     if (!suinsInput.trim()) return;
 
     setIsSaving(true);
@@ -180,9 +212,9 @@ export function Dashboard() {
     setShowSuiNSModal(false);
     setSuinsInput("");
     toast.success("Display name set successfully!");
-  };
+  }, [suinsInput, updateUser]);
 
-  const handleContentUpload = async () => {
+  const handleContentUpload = useCallback(async () => {
     if (!selectedFile) {
       toast.error("Please select a file to upload");
       return;
@@ -230,20 +262,27 @@ export function Dashboard() {
 
       // Invalidate and refetch content list for this profile
       await queryClient.invalidateQueries({
-        queryKey: ["contentList", myProfile?.objectId],
+        queryKey: ["contentList", myProfile.objectId],
       });
       await queryClient.refetchQueries({
-        queryKey: ["contentList", myProfile?.objectId],
+        queryKey: ["contentList", myProfile.objectId],
       });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to upload content",
       );
     }
-  };
+  }, [selectedFile, contentTitle, myProfile, myCreatorCap, account, uploadContent, contentDescription, contentType, queryClient]);
 
-  // User is a creator if they have an on-chain profile or the mock flag is set
-  const isCreator = !!myProfile || !!user.isCreator;
+  // Effect to redirect if not logged in
+  useEffect(() => {
+    if (!user) {
+      router.push("/?signin=true");
+    }
+  }, [user, router]);
+
+  // Early returns AFTER all hooks
+  if (!user) return null;
 
   if (!isCreator) {
     return (
@@ -291,20 +330,6 @@ export function Dashboard() {
       </div>
     );
   }
-
-  const userContent =
-    onchainContent && onchainContent.length > 0
-      ? onchainContent.map((c) =>
-          onchainContentToContent(c, myProfile?.objectId || user.id, true),
-        )
-      : mockContent.filter((c) => c.creatorId === user.id);
-
-  const displayBalance = myProfile
-    ? myProfile.balance / MIST_PER_SUI
-    : user.creatorProfile?.balance || 0;
-  const displaySupporters = myProfile
-    ? myProfile.totalSupporters
-    : user.creatorProfile?.supporterCount || 0;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -510,16 +535,6 @@ export function Dashboard() {
                     const blobUrl = blobId
                       ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
                       : null;
-
-                    // Debug: log to see if blobId exists
-                    console.log(
-                      "Dashboard Content:",
-                      content.title,
-                      "BlobId:",
-                      blobId,
-                      "Has URL:",
-                      !!blobUrl,
-                    );
 
                     return (
                       <div key={content.id} className="space-y-2">

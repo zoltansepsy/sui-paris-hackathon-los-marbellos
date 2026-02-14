@@ -22,7 +22,8 @@ export function useCreatorProfile(profileId: string | undefined) {
     queryKey: ["creatorProfile", profileId],
     queryFn: () => service.getCreatorProfile(profileId!),
     enabled: !!profileId,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -41,8 +42,9 @@ export function useCreatorProfiles(limit?: number) {
   return useQuery({
     queryKey: ["creatorProfiles", limit],
     queryFn: () => service.getCreatorProfiles(limit),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 }
 
@@ -62,7 +64,8 @@ export function useMyCreatorProfile(address: string | undefined) {
     queryKey: ["myCreatorProfile", address],
     queryFn: () => service.getCreatorByOwner(address!),
     enabled: !!address,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -82,7 +85,8 @@ export function useMyCreatorCap(address: string | undefined) {
     queryKey: ["myCreatorCap", address],
     queryFn: () => service.getCreatorCapByOwner(address!),
     enabled: !!address,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -102,7 +106,8 @@ export function useContentList(profileId: string | undefined) {
     queryKey: ["contentList", profileId],
     queryFn: () => service.getContentList(profileId!),
     enabled: !!profileId,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -123,6 +128,7 @@ export function useCreatorProfilesByIds(profileIds: string[] | undefined) {
     queryKey: ["creatorProfilesByIds", profileIds?.join(",")],
     queryFn: () => service.getCreatorProfilesByIds(profileIds!),
     enabled: !!profileIds && profileIds.length > 0,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
