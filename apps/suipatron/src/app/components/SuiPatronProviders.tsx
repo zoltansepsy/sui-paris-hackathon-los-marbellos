@@ -4,8 +4,18 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { networkConfig } from "@hack/blockchain/sdk/networkConfig";
+import { initEnokiWallets } from "../lib/enoki-wallet-register";
 
 const DEFAULT_NETWORK = "testnet";
+
+// WebTree-style: register Enoki wallets so ConnectButton shows Google + wallets in one modal
+if (typeof window !== "undefined") {
+  try {
+    initEnokiWallets();
+  } catch (e) {
+    console.warn("[SuiPatron] Enoki wallet registration failed:", e);
+  }
+}
 
 export function SuiPatronProviders({
   children,

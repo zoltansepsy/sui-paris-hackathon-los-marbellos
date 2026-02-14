@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
-import { isEnokiConfigured } from "../lib/enoki-provider";
 import { ConnectButton } from "@mysten/dapp-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
@@ -177,14 +176,7 @@ export function Header() {
               </Sheet>
             </>
           ) : (
-            <div className="flex items-center gap-2">
-              {isEnokiConfigured && (
-                <Button onClick={() => signIn()} variant="default" size="sm">
-                  Sign in
-                </Button>
-              )}
-              <ConnectButton connectText="Connect Wallet" />
-            </div>
+            <ConnectButton connectText="Sign in" />
           )}
         </div>
       </div>

@@ -44,22 +44,39 @@ function userFromAddress(address: string): User {
 
 function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
   const enoki = useEnokiFlow();
+  const account = useCurrentAccount();
+  const { mutate: disconnect } = useDisconnectWallet();
   const [user, setUser] = useState<User | null>(null);
+  const [zkLoginUser, setZkLoginUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Sync from Enoki redirect flow (createAuthorizationURL → callback)
   useEffect(() => {
-    const syncUser = (state: { address?: string }) => {
+    const syncZk = (state: { address?: string }) => {
       if (state?.address) {
-        setUser(userFromAddress(state.address));
+        setZkLoginUser(userFromAddress(state.address));
       } else {
-        setUser(null);
+        setZkLoginUser(null);
       }
     };
-    syncUser(enoki.$zkLoginState.get());
+    syncZk(enoki.$zkLoginState.get());
     setIsLoading(false);
-    const unsub = enoki.$zkLoginState.subscribe(syncUser);
+    const unsub = enoki.$zkLoginState.subscribe(syncZk);
     return () => unsub();
   }, [enoki]);
+
+  // User is zkLogin state OR connected account (ConnectButton modal: Google or wallet)
+  useEffect(() => {
+    if (zkLoginUser) {
+      setUser(zkLoginUser);
+      return;
+    }
+    if (account?.address) {
+      setUser(userFromAddress(account.address));
+      return;
+    }
+    setUser(null);
+  }, [zkLoginUser, account?.address]);
 
   const signIn = useCallback(async () => {
     const redirectUrl =
@@ -77,8 +94,10 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await enoki.logout();
+    disconnect();
     setUser(null);
-  }, [enoki]);
+    setZkLoginUser(null);
+  }, [enoki, disconnect]);
 
   const updateUser = useCallback((updates: Partial<User>) => {
     setUser((u) => (u ? { ...u, ...updates } : null));
