@@ -1,9 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "deploymentProtection": {
-    "production": "none",
-    "preview": "none"
-  },
   "crons": [
     {
       "path": "/api/events",
