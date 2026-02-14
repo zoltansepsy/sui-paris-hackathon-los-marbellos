@@ -176,12 +176,15 @@ export function Header() {
                 </SheetContent>
               </Sheet>
             </>
-          ) : isEnokiConfigured ? (
-            <Button onClick={() => signIn()} variant="default">
-              Sign in
-            </Button>
           ) : (
-            <ConnectButton connectText="Connect Wallet" />
+            <div className="flex items-center gap-2">
+              {isEnokiConfigured && (
+                <Button onClick={() => signIn()} variant="default" size="sm">
+                  Sign in
+                </Button>
+              )}
+              <ConnectButton connectText="Connect Wallet" />
+            </div>
           )}
         </div>
       </div>

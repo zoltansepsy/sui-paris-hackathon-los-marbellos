@@ -92,14 +92,20 @@ export function Landing() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               {isEnokiConfigured ? (
-                <Button
-                  size="lg"
-                  className="text-lg px-8"
-                  onClick={handleSignInWithGoogle}
-                >
-                  <Heart className="mr-2 h-5 w-5" />
-                  Sign in with Google
-                </Button>
+                <>
+                  <Button
+                    size="lg"
+                    className="text-lg px-8"
+                    onClick={handleSignInWithGoogle}
+                  >
+                    <Heart className="mr-2 h-5 w-5" />
+                    Sign in with Google
+                  </Button>
+                  <ConnectButton
+                    connectText="Connect Wallet"
+                    className="!text-lg !px-8 !h-12"
+                  />
+                </>
               ) : (
                 <ConnectButton
                   connectText="Connect Wallet"
@@ -270,7 +276,7 @@ export function Landing() {
             className="text-lg px-8"
             onClick={() => setShowSignIn(true)}
           >
-            Sign in with Google
+            {isEnokiConfigured ? "Sign in or connect wallet" : "Sign in"}
           </Button>
         </div>
       </section>
@@ -282,7 +288,7 @@ export function Landing() {
             <DialogTitle>Sign in to SuiPatron</DialogTitle>
             <DialogDescription>
               {isEnokiConfigured
-                ? "Use your Google account to get started. No wallet setup required."
+                ? "Sign in with Google (no wallet needed) or connect your SUI wallet."
                 : "Enter your email to sign in (demo mode)."}
             </DialogDescription>
           </DialogHeader>
@@ -299,6 +305,22 @@ export function Landing() {
               >
                 Sign in with Google
               </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    or
+                  </span>
+                </div>
+              </div>
+              <div
+                className="flex justify-center"
+                onClick={() => setShowSignIn(false)}
+              >
+                <ConnectButton connectText="Connect Wallet" />
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSignInWithEmail} className="space-y-4 py-4">
