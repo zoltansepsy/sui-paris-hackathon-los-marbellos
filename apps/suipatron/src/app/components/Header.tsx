@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
-import { ConnectButton } from "@mysten/dapp-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import {
@@ -14,19 +13,12 @@ import {
 } from "../components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet";
 import { Badge } from "../components/ui/badge";
-import {
-  User,
-  LayoutDashboard,
-  Settings,
-  LogOut,
-  Heart,
-  Menu,
-} from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Heart, Menu } from "lucide-react";
 import { useState } from "react";
 import { useSuinsName } from "../hooks/useSuins";
 
 export function Header() {
-  const { user, walletAddress, signOut } = useAuth();
+  const { user, walletAddress, signOut, signIn } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Automatically resolve SuiNS name from wallet address
@@ -183,7 +175,9 @@ export function Header() {
               </Sheet>
             </>
           ) : (
-            <ConnectButton />
+            <Button onClick={() => signIn()} variant="default">
+              Sign in
+            </Button>
           )}
         </div>
       </div>

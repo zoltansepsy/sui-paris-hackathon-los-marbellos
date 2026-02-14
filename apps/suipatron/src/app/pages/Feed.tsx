@@ -4,8 +4,15 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useMyAccessPasses } from "../hooks/useAccessPass";
-import { useCreatorProfilesByIds, useCreatorProfiles, useContentList } from "../hooks/useCreator";
-import { creatorProfileToCreator, onchainContentToContent } from "../lib/adapters";
+import {
+  useCreatorProfilesByIds,
+  useCreatorProfiles,
+  useContentList,
+} from "../hooks/useCreator";
+import {
+  creatorProfileToCreator,
+  onchainContentToContent,
+} from "../lib/adapters";
 import { LoadingState } from "../components/LoadingState";
 import {
   Card,
@@ -30,6 +37,36 @@ export function Feed() {
     window.scrollTo(0, 0);
   }, []);
 
+  // Get unique creator profile IDs from access passes (before any early return)
+  const supportedCreatorIds = onchainPasses
+    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
+    : [];
+
+  // All hooks must be called unconditionally at the top
+  const { data: onchainCreatorProfiles, isLoading: creatorsLoading } =
+    useCreatorProfilesByIds(
+      supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
+    );
+
+  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } =
+    useCreatorProfiles();
+
+  const mostSupportedCreator = allCreatorProfiles
+    ? allCreatorProfiles.reduce(
+        (max, current) =>
+          current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
+        allCreatorProfiles[0],
+      )
+    : null;
+
+  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } =
+    useContentList(mostSupportedCreator?.objectId);
+
+  // Convert on-chain profiles to UI Creator type
+  const supportedCreators: Creator[] = onchainCreatorProfiles
+    ? onchainCreatorProfiles.map(creatorProfileToCreator)
+    : [];
+
   if (!user) {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center px-4 py-12">
@@ -51,40 +88,6 @@ export function Feed() {
     );
   }
 
-  // Get unique creator profile IDs from access passes
-  const supportedCreatorIds = onchainPasses
-    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
-    : [];
-
-  // Fetch the actual creator profiles for supported creators
-  const {
-    data: onchainCreatorProfiles,
-    isLoading: creatorsLoading,
-  } = useCreatorProfilesByIds(
-    supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
-  );
-
-  // Convert on-chain profiles to UI Creator type
-  const supportedCreators: Creator[] = onchainCreatorProfiles
-    ? onchainCreatorProfiles.map(creatorProfileToCreator)
-    : [];
-
-  // Fetch all creators to find the most supported one (for empty state)
-  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } = useCreatorProfiles();
-
-  // Find the most supported creator
-  const mostSupportedCreator = allCreatorProfiles
-    ? allCreatorProfiles.reduce((max, current) =>
-        current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
-        allCreatorProfiles[0]
-      )
-    : null;
-
-  // Fetch content for the most supported creator (for empty state)
-  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } = useContentList(
-    mostSupportedCreator?.objectId
-  );
-
   // For now, use supportedCreatorIds to show creator links
   const feedContent: (Content & { creator: Creator })[] = [];
 
@@ -99,11 +102,12 @@ export function Feed() {
     }
 
     // Convert most supported creator's content to UI format
-    const previewContent = mostSupportedContent && mostSupportedCreator
-      ? mostSupportedContent.map((c) =>
-          onchainContentToContent(c, mostSupportedCreator.objectId, false)
-        )
-      : [];
+    const previewContent =
+      mostSupportedContent && mostSupportedCreator
+        ? mostSupportedContent.map((c) =>
+            onchainContentToContent(c, mostSupportedCreator.objectId, false),
+          )
+        : [];
 
     const previewCreator = mostSupportedCreator
       ? creatorProfileToCreator(mostSupportedCreator)
@@ -169,7 +173,8 @@ export function Feed() {
 
                 <div className="text-center pt-4">
                   <p className="text-sm text-muted-foreground mb-4">
-                    Support {previewCreator.name} for {previewCreator.price} SUI to unlock all content
+                    Support {previewCreator.name} for {previewCreator.price} SUI
+                    to unlock all content
                   </p>
                   <Link href={`/creator/${previewCreator.id}`}>
                     <Button>Support Creator</Button>
