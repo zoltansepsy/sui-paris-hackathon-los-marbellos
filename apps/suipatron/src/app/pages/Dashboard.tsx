@@ -36,13 +36,16 @@ import {
 } from "../components/ui/dialog";
 import { ContentCard } from "../components/ContentCard";
 import { mockContent } from "../lib/mock-data";
-import { DollarSign, Users, FileUp, Loader2, CheckCircle2 } from "lucide-react";
+import { DollarSign, Users, FileUp, Loader2, CheckCircle2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
+import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 
 export function Dashboard() {
   const { user, walletAddress, updateUser } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const account = useCurrentAccount();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -425,13 +428,55 @@ export function Dashboard() {
             <CardContent>
               {userContent.length > 0 ? (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {userContent.map((content) => (
-                    <ContentCard
-                      key={content.id}
-                      content={content}
-                      isLocked={false}
-                    />
-                  ))}
+                  {userContent.map((content) => {
+                    const blobId = (content as any).blobId;
+                    const blobUrl = blobId
+                      ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
+                      : null;
+
+                    return (
+                      <div key={content.id} className="space-y-2">
+                        <ContentCard
+                          content={content}
+                          isLocked={false}
+                          blobId={blobId}
+                        />
+                        {blobUrl && (
+                          <div className="flex gap-2">
+                            <a
+                              href={blobUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                🔒 Encrypted
+                              </Button>
+                            </a>
+                            <a
+                              href={`data:text/html,<html><body><h1>Decrypted Content</h1><p>In a full implementation, this would show the decrypted content. For the demo, the preview is shown in the card above.</p><p><a href="${blobUrl}" target="_blank">View Encrypted Blob</a></p></body></html>`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full text-xs"
+                              >
+                                ✓ Decrypted
+                              </Button>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 space-y-4">
