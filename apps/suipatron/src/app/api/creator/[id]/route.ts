@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIndexerStore } from "@/app/lib/indexer/get-store";
+import { getCreator } from "@/app/lib/services/creators";
+import { getContentByProfile } from "@/app/lib/services/content";
+import { CreatorNotFoundError } from "@/shared/errors/custom-errors";
 
 /**
  * GET /api/creator/:id
@@ -10,7 +12,6 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const store = getIndexerStore();
     const { id } = await context.params;
     if (!id) {
       return NextResponse.json(
@@ -19,18 +20,19 @@ export async function GET(
       );
     }
 
-    const creator = await store.getCreator(id);
-    if (!creator) {
-      return NextResponse.json({ error: "Creator not found" }, { status: 404 });
-    }
-
-    const content = await store.getContentByProfile(id);
+    const [creator, content] = await Promise.all([
+      getCreator(id),
+      getContentByProfile(id),
+    ]);
 
     return NextResponse.json({
       creator,
       content,
     });
   } catch (e) {
+    if (e instanceof CreatorNotFoundError) {
+      return NextResponse.json({ error: e.message }, { status: 404 });
+    }
     const message = e instanceof Error ? e.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }

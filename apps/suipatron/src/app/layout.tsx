@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./lib/auth-context";
 import "./globals.css";
 
@@ -21,7 +21,12 @@ export default function RootLayout({
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />
-            <Toaster />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+              }}
+            />
           </div>
         </AuthProvider>
       </body>

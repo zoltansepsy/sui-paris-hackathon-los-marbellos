@@ -212,6 +212,8 @@ The architecture supports any file type (video, audio, archives) — we just nee
 | **View content** | Walrus download → SEAL decrypt (client validates via seal_approve) → render |
 | **Withdraw** | Frontend builds PTB → Enoki sponsors → SUI transferred to creator |
 
+> **PTB details:** See [docs/architecture/PTB-SPECIFICATION.md](architecture/PTB-SPECIFICATION.md) for create_profile, purchase_access, withdraw PTB builders.
+
 ### 3.3 Key Design Decisions
 
 | Decision | Why |
@@ -603,6 +605,8 @@ const address = await suiClient.resolveNameServiceAddress({ name: 'alice@suipatr
 ---
 
 ## 8. Task Breakdown
+
+> **Also see:** [docs/core-planning/01-product-breakdown.md](core-planning/01-product-breakdown.md) for task table; [docs/suipatron/01-product-breakdown-and-roadmap.md](suipatron/01-product-breakdown-and-roadmap.md) for PBS with status ([x]/[ ]).
 
 ### Smart Contract + Backend
 

@@ -25,7 +25,7 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 export function Settings() {
   const { user, updateUser, signOut } = useAuth();

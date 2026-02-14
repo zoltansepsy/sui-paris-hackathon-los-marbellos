@@ -27,7 +27,7 @@ import {
 import { ContentCard } from "../components/ContentCard";
 import { mockContent } from "../lib/mock-data";
 import { DollarSign, Users, FileUp, Loader2, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 export function Dashboard() {
   const { user, updateUser } = useAuth();

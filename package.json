@@ -16,8 +16,12 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "lint-staged": {
-    "apps/**/*.{ts,tsx}": [
+    "apps/dapp/**/*.{ts,tsx}": [
       "cd apps/dapp && eslint --fix --config eslint.config.mjs",
+      "prettier --write"
+    ],
+    "apps/suipatron/**/*.{ts,tsx}": [
+      "cd apps/suipatron && eslint --fix --config eslint.config.mjs",
       "prettier --write"
     ],
     "*.{ts,tsx}": [

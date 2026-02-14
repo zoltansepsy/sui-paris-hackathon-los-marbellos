@@ -19,7 +19,21 @@ import { readFileSync } from "fs";
 import { glob } from "glob";
 import path from "path";
 
-const APP_DIR = "apps/dapp";
+/** App configs: base path, lib path, api path, ts glob for any-check */
+const APP_CONFIGS = [
+  {
+    name: "dapp",
+    lib: "apps/dapp/lib",
+    api: "apps/dapp/app/api",
+    tsGlob: "apps/dapp/**/*.{ts,tsx}",
+  },
+  {
+    name: "suipatron",
+    lib: "apps/suipatron/src/app/lib",
+    api: "apps/suipatron/src/app/api",
+    tsGlob: "apps/suipatron/src/**/*.{ts,tsx}",
+  },
+] as const;
 
 interface PatternViolation {
   file: string;
@@ -41,84 +55,96 @@ function addViolation(
 
 // Check 1: Service functions in correct location
 function checkServiceLocation() {
-  const serviceFiles = glob.sync(`${APP_DIR}/lib/services/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
+  for (const app of APP_CONFIGS) {
+    const serviceFiles = glob.sync(`${app.lib}/services/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
 
-  for (const file of serviceFiles) {
-    const content = readFileSync(file, "utf-8");
+    for (const file of serviceFiles) {
+      const content = readFileSync(file, "utf-8");
 
-    const hasClassExport = /^export\s+class\s+\w+/.test(content);
-    const hasFunctionExport = /^export\s+(async\s+)?function\s+\w+/.test(
-      content,
-    );
-
-    if (hasClassExport && !hasFunctionExport) {
-      addViolation(
-        file,
-        "Service Pattern",
-        "Service files should export functions in Phase 1, not classes. Consider refactoring to functions or moving to Phase 2.",
+      const hasClassExport = /^export\s+class\s+\w+/.test(content);
+      const hasFunctionExport = /^export\s+(async\s+)?function\s+\w+/.test(
+        content,
       );
+
+      if (hasClassExport && !hasFunctionExport) {
+        addViolation(
+          file,
+          "Service Pattern",
+          "Service files should export functions in Phase 1, not classes. Consider refactoring to functions or moving to Phase 2.",
+        );
+      }
     }
   }
 }
 
 // Check 2: No direct Supabase/DB in API routes (use services)
 function checkAPIRoutes() {
-  const apiFiles = glob.sync(`${APP_DIR}/app/api/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
+  for (const app of APP_CONFIGS) {
+    const apiFiles = glob.sync(`${app.api}/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
 
-  for (const file of apiFiles) {
-    const content = readFileSync(file, "utf-8");
+    for (const file of apiFiles) {
+      const content = readFileSync(file, "utf-8");
 
-    const hasDirectSupabase = /from\s+['"]@supabase\/supabase-js['"]/.test(
-      content,
-    );
-    const usesService = /from\s+['"]@\/lib\/services/.test(content);
-
-    if (hasDirectSupabase && !usesService) {
-      addViolation(
-        file,
-        "Separation of Concerns",
-        "API routes should use service functions, not direct Supabase calls. Move database logic to lib/services/",
+      const hasDirectSupabase = /from\s+['"]@supabase\/supabase-js['"]/.test(
+        content,
       );
+      const usesService =
+        /from\s+['"]@\/lib\/services|from\s+['"]@\/app\/lib\/services/.test(
+          content,
+        );
+
+      if (hasDirectSupabase && !usesService) {
+        addViolation(
+          file,
+          "Separation of Concerns",
+          "API routes should use service functions, not direct Supabase calls. Move database logic to lib/services/",
+        );
+      }
     }
   }
 }
 
 // Check 3: Types defined in shared/types or @hack/types
 function checkTypeDefinitions() {
-  const serviceFiles = glob.sync(`${APP_DIR}/lib/services/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
+  for (const app of APP_CONFIGS) {
+    const serviceFiles = glob.sync(`${app.lib}/services/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
 
-  for (const file of serviceFiles) {
-    const content = readFileSync(file, "utf-8");
+    for (const file of serviceFiles) {
+      const content = readFileSync(file, "utf-8");
 
-    const hasInlineTypes = /(interface|type)\s+\w+\s*[={]/.test(content);
-    const importsTypes =
-      /from\s+['"]@\/shared\/types|from\s+['"]@hack\/types['"]/.test(content) ||
-      /from\s+['"]@\/lib\/shared\/types/.test(content);
+      const hasInlineTypes = /(interface|type)\s+\w+\s*[={]/.test(content);
+      const importsTypes =
+        /from\s+['"]@\/shared\/types|from\s+['"]@hack\/types['"]/.test(
+          content,
+        ) ||
+        /from\s+['"]@\/lib\/shared\/types/.test(content) ||
+        /from\s+['"]@\/app\/shared\/types/.test(content);
 
-    if (hasInlineTypes && !importsTypes) {
-      const lines = content.split("\n");
+      if (hasInlineTypes && !importsTypes) {
+        const lines = content.split("\n");
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
-        if (
-          (/^export\s+(interface|type)\s+\w+/.test(line) ||
-            /^export\s+type\s+\w+\s*=/.test(line)) &&
-          !line.includes("// ALLOWED") &&
-          !nextLine.includes("// ALLOWED")
-        ) {
-          addViolation(
-            file,
-            "Type Organization",
-            `Types should be defined in shared/types or @hack/types, not inline. Found at line ${i + 1}: ${line.trim()}`,
-            i + 1,
-          );
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
+          if (
+            (/^export\s+(interface|type)\s+\w+/.test(line) ||
+              /^export\s+type\s+\w+\s*=/.test(line)) &&
+            !line.includes("// ALLOWED") &&
+            !nextLine.includes("// ALLOWED")
+          ) {
+            addViolation(
+              file,
+              "Type Organization",
+              `Types should be defined in shared/types or @hack/types, not inline. Found at line ${i + 1}: ${line.trim()}`,
+              i + 1,
+            );
+          }
         }
       }
     }
@@ -127,60 +153,64 @@ function checkTypeDefinitions() {
 
 // Check 4: Error handling in services
 function checkErrorHandling() {
-  const serviceFiles = glob.sync(`${APP_DIR}/lib/services/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
+  for (const app of APP_CONFIGS) {
+    const serviceFiles = glob.sync(`${app.lib}/services/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
 
-  for (const file of serviceFiles) {
-    const content = readFileSync(file, "utf-8");
+    for (const file of serviceFiles) {
+      const content = readFileSync(file, "utf-8");
 
-    const asyncFunctions =
-      content.match(/export\s+async\s+function\s+\w+/g) || [];
-    const hasErrorHandling = /throw\s+new|try\s*\{|catch\s*\(/.test(content);
+      const asyncFunctions =
+        content.match(/export\s+async\s+function\s+\w+/g) || [];
+      const hasErrorHandling = /throw\s+new|try\s*\{|catch\s*\(/.test(content);
 
-    if (asyncFunctions.length > 0 && !hasErrorHandling) {
-      addViolation(
-        file,
-        "Error Handling",
-        "Service functions should include error handling. Use try/catch or throw custom errors.",
-      );
+      if (asyncFunctions.length > 0 && !hasErrorHandling) {
+        addViolation(
+          file,
+          "Error Handling",
+          "Service functions should include error handling. Use try/catch or throw custom errors.",
+        );
+      }
     }
   }
 }
 
 // Check 5: No 'any' types
 function checkNoAnyTypes() {
-  const tsFiles = glob.sync(`${APP_DIR}/**/*.{ts,tsx}`, {
-    ignore: [
-      "node_modules/**",
-      "**/*.d.ts",
-      "**/dist/**",
-      "**/.next/**",
-      "**/tools/**",
-      "**/packages/**",
-    ],
-  });
+  for (const app of APP_CONFIGS) {
+    const tsFiles = glob.sync(app.tsGlob, {
+      ignore: [
+        "node_modules/**",
+        "**/*.d.ts",
+        "**/dist/**",
+        "**/.next/**",
+        "**/tools/**",
+        "**/packages/**",
+      ],
+    });
 
-  for (const file of tsFiles) {
-    const content = readFileSync(file, "utf-8");
+    for (const file of tsFiles) {
+      const content = readFileSync(file, "utf-8");
 
-    const anyMatches = content.match(/:\s*any\b/g);
-    if (anyMatches) {
-      const lines = content.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
-        if (
-          line.includes(": any") &&
-          !line.includes("// ALLOWED") &&
-          !nextLine.includes("// ALLOWED")
-        ) {
-          addViolation(
-            file,
-            "Type Safety",
-            `Avoid 'any' types. Use 'unknown' or proper types. Found at line ${i + 1}`,
-            i + 1,
-          );
+      const anyMatches = content.match(/:\s*any\b/g);
+      if (anyMatches) {
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
+          if (
+            line.includes(": any") &&
+            !line.includes("// ALLOWED") &&
+            !nextLine.includes("// ALLOWED")
+          ) {
+            addViolation(
+              file,
+              "Type Safety",
+              `Avoid 'any' types. Use 'unknown' or proper types. Found at line ${i + 1}`,
+              i + 1,
+            );
+          }
         }
       }
     }
@@ -189,59 +219,61 @@ function checkNoAnyTypes() {
 
 // Check 6: Function complexity (lines)
 function checkFunctionComplexity() {
-  const serviceFiles = glob.sync(`${APP_DIR}/lib/services/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
-  const MAX_FUNCTION_LINES = 100;
+  for (const app of APP_CONFIGS) {
+    const serviceFiles = glob.sync(`${app.lib}/services/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
+    const MAX_FUNCTION_LINES = 100;
 
-  for (const file of serviceFiles) {
-    const content = readFileSync(file, "utf-8");
-    const lines = content.split("\n");
+    for (const file of serviceFiles) {
+      const content = readFileSync(file, "utf-8");
+      const lines = content.split("\n");
 
-    const functionRegex = /export\s+(async\s+)?function\s+(\w+)/g;
-    let match;
+      const functionRegex = /export\s+(async\s+)?function\s+(\w+)/g;
+      let match;
 
-    while ((match = functionRegex.exec(content)) !== null) {
-      const functionName = match[2];
-      const startIndex = match.index;
+      while ((match = functionRegex.exec(content)) !== null) {
+        const functionName = match[2];
+        const startIndex = match.index;
 
-      let braceCount = 0;
-      let inFunction = false;
-      let functionStartLine = 0;
-      let functionEndLine = 0;
+        let braceCount = 0;
+        let inFunction = false;
+        let functionStartLine = 0;
+        let functionEndLine = 0;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const lineStart = content.indexOf(
-          line,
-          i > 0 ? content.indexOf(lines[i - 1]) + lines[i - 1].length : 0,
-        );
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const lineStart = content.indexOf(
+            line,
+            i > 0 ? content.indexOf(lines[i - 1]) + lines[i - 1].length : 0,
+          );
 
-        if (lineStart <= startIndex && startIndex < lineStart + line.length) {
-          inFunction = true;
-          functionStartLine = i;
-        }
+          if (lineStart <= startIndex && startIndex < lineStart + line.length) {
+            inFunction = true;
+            functionStartLine = i;
+          }
 
-        if (inFunction) {
-          braceCount += (line.match(/{/g) || []).length;
-          braceCount -= (line.match(/}/g) || []).length;
+          if (inFunction) {
+            braceCount += (line.match(/{/g) || []).length;
+            braceCount -= (line.match(/}/g) || []).length;
 
-          if (braceCount === 0 && i > functionStartLine) {
-            functionEndLine = i;
-            break;
+            if (braceCount === 0 && i > functionStartLine) {
+              functionEndLine = i;
+              break;
+            }
           }
         }
-      }
 
-      const functionLines = functionEndLine - functionStartLine + 1;
+        const functionLines = functionEndLine - functionStartLine + 1;
 
-      if (functionLines > MAX_FUNCTION_LINES) {
-        addViolation(
-          file,
-          "Function Complexity",
-          `Function '${functionName}' is ${functionLines} lines (max: ${MAX_FUNCTION_LINES}). Consider refactoring or splitting.`,
-          functionStartLine + 1,
-        );
+        if (functionLines > MAX_FUNCTION_LINES) {
+          addViolation(
+            file,
+            "Function Complexity",
+            `Function '${functionName}' is ${functionLines} lines (max: ${MAX_FUNCTION_LINES}). Consider refactoring or splitting.`,
+            functionStartLine + 1,
+          );
+        }
       }
     }
   }
@@ -249,23 +281,25 @@ function checkFunctionComplexity() {
 
 // Check 7: Feature-based structure
 function checkFeatureStructure() {
-  const serviceFiles = glob.sync(`${APP_DIR}/lib/services/**/*.ts`, {
-    ignore: ["node_modules/**"],
-  });
+  for (const app of APP_CONFIGS) {
+    const serviceFiles = glob.sync(`${app.lib}/services/**/*.ts`, {
+      ignore: ["node_modules/**"],
+    });
 
-  for (const file of serviceFiles) {
-    const fileName = path.basename(file, ".ts");
-    const dirName = path.dirname(file);
+    for (const file of serviceFiles) {
+      const fileName = path.basename(file, ".ts");
+      const dirName = path.dirname(file);
 
-    const expectedDir = `lib/services/${fileName}`;
-    if (!dirName.includes(fileName) && fileName !== "index") {
-      console.warn(
-        "Consider organizing " +
-          file +
-          " by feature (e.g., lib/services/" +
-          fileName +
-          "/)",
-      );
+      const expectedDir = `lib/services/${fileName}`;
+      if (!dirName.includes(fileName) && fileName !== "index") {
+        console.warn(
+          "Consider organizing " +
+            file +
+            " by feature (e.g., lib/services/" +
+            fileName +
+            "/)",
+        );
+      }
     }
   }
 }

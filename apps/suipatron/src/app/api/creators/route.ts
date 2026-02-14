@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIndexerStore } from "@/app/lib/indexer/get-store";
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+import { getCreators } from "@/app/lib/services/creators";
+import { parseCreatorsQuery } from "@/shared/validation/creator.schema";
 
 /**
  * GET /api/creators
@@ -11,21 +9,12 @@ const MAX_LIMIT = 100;
  */
 export async function GET(request: NextRequest) {
   try {
-    const store = getIndexerStore();
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(
-      MAX_LIMIT,
-      Math.max(1, Number(searchParams.get("limit")) || DEFAULT_LIMIT),
-    );
-    const cursor = searchParams.get("cursor") ?? undefined;
+    const { limit, cursor } = parseCreatorsQuery(searchParams);
 
-    const { creators, nextCursor } = await store.getCreators(limit, cursor);
+    const result = await getCreators(limit, cursor ?? undefined);
 
-    return NextResponse.json({
-      creators,
-      nextCursor,
-      hasNextPage: nextCursor != null,
-    });
+    return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
+import { useAccessPasses } from "../lib/access-pass";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
-import { mockCreators, mockContent, hasAccessPass } from "../lib/mock-data";
+import { mockCreators, mockContent } from "../lib/mock-data";
 import { Users, Lock, CheckCircle2, Settings } from "lucide-react";
 
 export function CreatorProfile() {
@@ -17,8 +18,8 @@ export function CreatorProfile() {
   const router = useRouter();
   const id = params.id as string;
   const { user } = useAuth();
+  const { hasAccessPass, refresh } = useAccessPasses(user?.id);
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
 
   const creator = mockCreators.find((c) => c.id === id);
 
@@ -33,7 +34,7 @@ export function CreatorProfile() {
   }
 
   const creatorContent = mockContent.filter((c) => c.creatorId === creator.id);
-  const userHasAccess = user ? hasAccessPass(user.id, creator.id) : false;
+  const userHasAccess = user ? hasAccessPass(creator.id) : false;
   const isOwnProfile =
     user?.id === creator.id ||
     (user?.isCreator && user?.email === creator.email);
@@ -182,7 +183,7 @@ export function CreatorProfile() {
           creator={creator}
           open={showSupportModal}
           onOpenChange={setShowSupportModal}
-          onSuccess={() => setForceUpdate((prev) => prev + 1)}
+          onSuccess={() => refresh()}
         />
       )}
     </div>

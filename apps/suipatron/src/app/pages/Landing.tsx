@@ -14,7 +14,7 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Shield, Zap, Globe, Users, CheckCircle2, Heart } from "lucide-react";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 export function Landing() {
   const router = useRouter();

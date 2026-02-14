@@ -1,28 +1,6 @@
-import { getAccessPassStorage } from "./storage";
+import type { Creator, Content } from "@/shared/types/creator.types";
 
-export interface Creator {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  suinsName?: string;
-  bio?: string;
-  price: number;
-  balance?: number;
-  contentCount: number;
-  supporterCount: number;
-}
-
-export interface Content {
-  id: string;
-  creatorId: string;
-  title: string;
-  description?: string;
-  type: "image" | "text" | "pdf";
-  thumbnail?: string;
-  isLocked: boolean;
-  createdAt: Date;
-}
+export type { Creator, Content } from "@/shared/types/creator.types";
 
 export const mockCreators: Creator[] = [
   {
@@ -201,27 +179,3 @@ export const mockContent: Content[] = [
     createdAt: new Date("2025-02-08"),
   },
 ];
-
-// Track which creators the user has supported (uses same safe storage as auth-context)
-export const getUserAccessPasses = (userId: string): string[] => {
-  const stored = getAccessPassStorage().getItem(`suipatron_access_${userId}`);
-  if (!stored) return [];
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-};
-
-export const addAccessPass = (userId: string, creatorId: string) => {
-  const store = getAccessPassStorage();
-  const current = getUserAccessPasses(userId);
-  if (!current.includes(creatorId)) {
-    current.push(creatorId);
-    store.setItem(`suipatron_access_${userId}`, JSON.stringify(current));
-  }
-};
-
-export const hasAccessPass = (userId: string, creatorId: string): boolean => {
-  return getUserAccessPasses(userId).includes(creatorId);
-};

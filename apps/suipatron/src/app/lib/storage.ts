@@ -23,25 +23,31 @@ function memAdapter(): StorageAdapter {
 }
 
 function createStorage(): StorageAdapter {
+  // Never use localStorage in Node (SSR, or broken --localstorage-file polyfill)
   if (typeof window === "undefined") return memAdapter();
+  const isNode =
+    typeof process !== "undefined" &&
+    process.versions != null &&
+    typeof process.versions.node === "string";
+  if (isNode) return memAdapter();
+
   try {
     const s = window.localStorage;
     if (
-      s &&
-      typeof s.getItem === "function" &&
-      typeof s.setItem === "function"
-    ) {
-      s.getItem("_"); // Prove callable (Node polyfill can have non-function getItem)
-      return {
-        getItem: (k) => s.getItem(k),
-        setItem: (k, v) => s.setItem(k, v),
-        removeItem: (k) => s.removeItem(k),
-      };
-    }
+      !s ||
+      typeof s.getItem !== "function" ||
+      typeof s.setItem !== "function"
+    )
+      return memAdapter();
+    s.getItem("_"); // Prove callable (polyfill can expose non-callable getItem)
+    return {
+      getItem: (k) => s.getItem(k),
+      setItem: (k, v) => s.setItem(k, v),
+      removeItem: (k) => s.removeItem(k),
+    };
   } catch {
-    // localStorage unavailable or broken
+    return memAdapter();
   }
-  return memAdapter();
 }
 
 const _storage = createStorage();

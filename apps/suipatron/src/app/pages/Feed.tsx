@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
+import { useAccessPasses } from "../lib/access-pass";
 import {
   Card,
   CardContent,
@@ -13,15 +14,12 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { ContentCard } from "../components/ContentCard";
-import {
-  mockCreators,
-  mockContent,
-  getUserAccessPasses,
-} from "../lib/mock-data";
+import { mockCreators, mockContent } from "../lib/mock-data";
 import { Heart } from "lucide-react";
 
 export function Feed() {
   const { user } = useAuth();
+  const { accessPasses } = useAccessPasses(user?.id);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -48,7 +46,6 @@ export function Feed() {
     );
   }
 
-  const accessPasses = getUserAccessPasses(user.id);
   const supportedCreators = mockCreators.filter((c) =>
     accessPasses.includes(c.id),
   );

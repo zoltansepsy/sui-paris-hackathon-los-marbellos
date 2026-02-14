@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import { useAccessPasses } from "../lib/access-pass";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,8 @@ import {
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import { Creator, addAccessPass } from "../lib/mock-data";
-import { toast } from "sonner";
+import type { Creator } from "../lib/mock-data";
+import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
 interface SupportModalProps {
@@ -32,6 +33,7 @@ export function SupportModal({
   onSuccess,
 }: SupportModalProps) {
   const { user } = useAuth();
+  const { addAccessPass } = useAccessPasses(user?.id);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -47,8 +49,8 @@ export function SupportModal({
     // Simulate transaction processing
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Add access pass
-    addAccessPass(user.id, creator.id);
+    // Add access pass (client-only, uses dynamic import)
+    addAccessPass(creator.id);
 
     setIsProcessing(false);
     onOpenChange(false);

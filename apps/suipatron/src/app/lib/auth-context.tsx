@@ -1,23 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { getAuthStorage } from "./storage";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  suinsName?: string;
-  isCreator?: boolean;
-  creatorProfile?: {
-    bio?: string;
-    price?: number;
-    balance?: number;
-    contentCount?: number;
-    supporterCount?: number;
-  };
-}
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
+import type { User } from "@/shared/types/user.types";
 
 interface AuthContextType {
   user: User | null;
@@ -28,22 +18,32 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const storage = getAuthStorage();
+
+type StorageAdapter = {
+  getItem: (k: string) => string | null;
+  setItem: (k: string, v: string) => void;
+  removeItem: (k: string) => void;
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const storageRef = useRef<StorageAdapter | null>(null);
 
   useEffect(() => {
-    const storedUser = storage.getItem("suipatron_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        // ignore corrupt data
+    // Dynamic import: storage module only loads on client, never during SSR
+    import("./storage").then(({ getAuthStorage }) => {
+      storageRef.current = getAuthStorage();
+      const stored = storageRef.current.getItem("suipatron_user");
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          // ignore corrupt data
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
   }, []);
 
   const signIn = async (email: string) => {
@@ -59,20 +59,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     setUser(newUser);
+    const storage =
+      storageRef.current ?? (await import("./storage")).getAuthStorage();
     storage.setItem("suipatron_user", JSON.stringify(newUser));
     setIsLoading(false);
   };
 
   const signOut = () => {
     setUser(null);
-    storage.removeItem("suipatron_user");
+    storageRef.current?.removeItem("suipatron_user");
   };
 
   const updateUser = (updates: Partial<User>) => {
     if (!user) return;
     const updatedUser = { ...user, ...updates };
     setUser(updatedUser);
-    storage.setItem("suipatron_user", JSON.stringify(updatedUser));
+    storageRef.current?.setItem("suipatron_user", JSON.stringify(updatedUser));
   };
 
   return (
