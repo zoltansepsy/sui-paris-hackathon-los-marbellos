@@ -85,8 +85,9 @@ export function Landing() {
             </h1>
 
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              One-time payment. Permanent access. No monthly fees. No platform
-              fees. Content owned by creators, accessible to supporters forever.
+              Flexible access — pay once for permanent access, or subscribe at
+              your own pace. No platform fees. Content owned by creators,
+              powered by SUI.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -191,11 +192,11 @@ export function Landing() {
                 <CheckCircle2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-semibold text-lg mb-2">
-                    Permanent Access
+                    Flexible Access
                   </h3>
                   <p className="text-muted-foreground">
-                    Pay once, own forever. No recurring subscriptions or
-                    surprise charges.
+                    Choose permanent one-time access or affordable subscription
+                    tiers. Always transparent pricing.
                   </p>
                 </div>
               </div>

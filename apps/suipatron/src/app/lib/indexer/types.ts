@@ -73,6 +73,10 @@ export interface IndexerStore {
   upsertHandle(entry: IndexedHandle): Promise<void>;
   getHandle(handle: string): Promise<IndexedHandle | undefined>;
   getHandleByProfileId(profileId: string): Promise<IndexedHandle | undefined>;
+  updateAccessPassExpiry(
+    accessPassId: string,
+    newExpiresAt: number,
+  ): Promise<void>;
   getLastCursor(eventType: string): Promise<string | undefined>;
   setLastCursor(eventType: string, cursor: string): Promise<void>;
 }

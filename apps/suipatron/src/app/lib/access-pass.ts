@@ -11,6 +11,7 @@ export interface AccessPassEntry {
   creatorId: string;
   tierLevel: number;
   expiresAt: number | null; // epoch ms, null = permanent
+  accessPassId: string | null; // on-chain AccessPass object ID
 }
 
 type StorageAdapter = {
@@ -25,10 +26,16 @@ function migrateEntries(raw: unknown): AccessPassEntry[] {
   return raw.map((item) => {
     if (typeof item === "string") {
       // Legacy format: just a creator ID string
-      return { creatorId: item, tierLevel: 1, expiresAt: null };
+      return {
+        creatorId: item,
+        tierLevel: 1,
+        expiresAt: null,
+        accessPassId: null,
+      };
     }
-    // Already new format
-    return item as AccessPassEntry;
+    // Ensure accessPassId field exists (backward compat)
+    const entry = item as AccessPassEntry;
+    return { ...entry, accessPassId: entry.accessPassId ?? null };
   });
 }
 
@@ -82,16 +89,31 @@ export function useAccessPasses(userId: string | undefined) {
       creatorId: string,
       tierLevel: number = 1,
       expiresAt: number | null = null,
+      accessPassId: string | null = null,
     ) => {
       if (!userId || !storageRef.current) return;
       const current = [...entries];
       const existingIdx = current.findIndex((e) => e.creatorId === creatorId);
-      const newEntry: AccessPassEntry = { creatorId, tierLevel, expiresAt };
+      const newEntry: AccessPassEntry = {
+        creatorId,
+        tierLevel,
+        expiresAt,
+        accessPassId,
+      };
       if (existingIdx >= 0) {
-        // Upgrade: keep the higher tier level
-        if (tierLevel > current[existingIdx].tierLevel) {
+        const existing = current[existingIdx];
+        if (tierLevel > existing.tierLevel) {
+          // Upgrade to higher tier
           current[existingIdx] = newEntry;
+        } else if (tierLevel === existing.tierLevel) {
+          // Same-tier renewal: update expiresAt and accessPassId
+          current[existingIdx] = {
+            ...existing,
+            expiresAt,
+            accessPassId: accessPassId ?? existing.accessPassId,
+          };
         }
+        // Lower tier: ignore (downgrade not supported)
       } else {
         current.push(newEntry);
       }
@@ -102,6 +124,13 @@ export function useAccessPasses(userId: string | undefined) {
       setEntries(current);
     },
     [userId, entries],
+  );
+
+  const getEntry = useCallback(
+    (creatorId: string): AccessPassEntry | undefined => {
+      return entries.find((e) => e.creatorId === creatorId);
+    },
+    [entries],
   );
 
   const refresh = useCallback(() => {
@@ -126,6 +155,7 @@ export function useAccessPasses(userId: string | undefined) {
     hasAccessPass,
     hasAccessAtTier,
     addAccessPass,
+    getEntry,
     refresh,
   };
 }

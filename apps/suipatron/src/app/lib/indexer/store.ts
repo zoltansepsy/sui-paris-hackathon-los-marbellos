@@ -112,6 +112,16 @@ const syncStore = {
     return handlesByProfile.get(profileId);
   },
 
+  updateAccessPassExpiry(accessPassId: string, newExpiresAt: number): void {
+    for (const [, list] of purchasesByProfile) {
+      const entry = list.find((p) => p.accessPassId === accessPassId);
+      if (entry) {
+        entry.expiresAt = newExpiresAt;
+        return;
+      }
+    }
+  },
+
   getLastCursor(eventType: string): string | undefined {
     return (
       globalThis as unknown as { __indexerCursors?: Record<string, string> }
@@ -142,6 +152,8 @@ export const indexerStore: IndexerStore = {
   getHandle: (h) => Promise.resolve(syncStore.getHandle(h)),
   getHandleByProfileId: (id) =>
     Promise.resolve(syncStore.getHandleByProfileId(id)),
+  updateAccessPassExpiry: (id, exp) =>
+    Promise.resolve(syncStore.updateAccessPassExpiry(id, exp)),
   getLastCursor: (t) => Promise.resolve(syncStore.getLastCursor(t)),
   setLastCursor: (t, c) => Promise.resolve(syncStore.setLastCursor(t, c)),
 };

@@ -5,20 +5,28 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useAccessPasses } from "../lib/access-pass";
+import { getSubscriptionStatus, formatExpiry } from "../lib/subscription-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
 import { mockCreators, mockContent } from "../lib/mock-data";
-import { Users, Lock, CheckCircle2, Settings } from "lucide-react";
+import {
+  Users,
+  Lock,
+  CheckCircle2,
+  Settings,
+  AlertCircle,
+  Clock,
+} from "lucide-react";
 
 export function CreatorProfile() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const { user } = useAuth();
-  const { hasAccessPass, refresh } = useAccessPasses(user?.id);
+  const { hasAccessPass, getEntry, refresh } = useAccessPasses(user?.id);
   const [showSupportModal, setShowSupportModal] = useState(false);
 
   const creator = mockCreators.find((c) => c.id === id);
@@ -38,6 +46,25 @@ export function CreatorProfile() {
   const isOwnProfile =
     user?.id === creator.id ||
     (user?.isCreator && user?.email === creator.email);
+
+  const accessEntry = user ? getEntry(creator.id) : undefined;
+  const subStatus = accessEntry
+    ? getSubscriptionStatus(accessEntry.expiresAt)
+    : null;
+
+  // Show "has access" banner even if expired (with renewal CTA)
+  const hasAnyPass = !!accessEntry;
+
+  // Renewal mode for SupportModal
+  const renewMode =
+    (subStatus === "expired" || subStatus === "expiring") &&
+    accessEntry?.accessPassId
+      ? {
+          accessPassId: accessEntry.accessPassId,
+          tierLevel: accessEntry.tierLevel,
+          currentExpiresAt: accessEntry.expiresAt,
+        }
+      : undefined;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -109,19 +136,61 @@ export function CreatorProfile() {
                 <Button>Go to Dashboard</Button>
               </Link>
             </div>
-          ) : userHasAccess ? (
-            <div className="flex items-center justify-between p-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          ) : hasAnyPass ? (
+            <div
+              className={`flex items-center justify-between p-6 rounded-lg border ${
+                subStatus === "expired"
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                  : subStatus === "expiring"
+                    ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                    : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+              }`}
+            >
               <div className="flex items-center space-x-3">
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                {subStatus === "expired" ? (
+                  <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                ) : subStatus === "expiring" ? (
+                  <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                )}
                 <div>
-                  <p className="font-semibold text-green-900 dark:text-green-100">
-                    You have access to all content
+                  <p
+                    className={`font-semibold ${
+                      subStatus === "expired"
+                        ? "text-red-900 dark:text-red-100"
+                        : subStatus === "expiring"
+                          ? "text-amber-900 dark:text-amber-100"
+                          : "text-green-900 dark:text-green-100"
+                    }`}
+                  >
+                    {subStatus === "expired"
+                      ? "Your subscription has expired"
+                      : subStatus === "expiring"
+                        ? "Your subscription is expiring soon"
+                        : "You have access to all content"}
                   </p>
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    Thank you for supporting this creator
+                  <p
+                    className={`text-sm ${
+                      subStatus === "expired"
+                        ? "text-red-700 dark:text-red-300"
+                        : subStatus === "expiring"
+                          ? "text-amber-700 dark:text-amber-300"
+                          : "text-green-700 dark:text-green-300"
+                    }`}
+                  >
+                    {accessEntry?.expiresAt
+                      ? formatExpiry(accessEntry.expiresAt)
+                      : "Permanent access - Thank you for supporting this creator"}
                   </p>
                 </div>
               </div>
+              {(subStatus === "expired" || subStatus === "expiring") &&
+                accessEntry?.accessPassId && (
+                  <Button onClick={() => setShowSupportModal(true)}>
+                    Renew Subscription
+                  </Button>
+                )}
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
@@ -162,6 +231,9 @@ export function CreatorProfile() {
                   key={content.id}
                   content={content}
                   isLocked={!userHasAccess && !isOwnProfile}
+                  expiryStatus={
+                    userHasAccess && !isOwnProfile ? subStatus : null
+                  }
                   onClick={
                     !userHasAccess && !isOwnProfile
                       ? () => setShowSupportModal(true)
@@ -188,6 +260,7 @@ export function CreatorProfile() {
           open={showSupportModal}
           onOpenChange={setShowSupportModal}
           onSuccess={() => refresh()}
+          renewMode={renewMode}
         />
       )}
     </div>

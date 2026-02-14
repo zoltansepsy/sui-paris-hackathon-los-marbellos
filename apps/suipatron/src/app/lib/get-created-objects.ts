@@ -43,3 +43,36 @@ export async function getCreatedProfileFromTx(
   }
   return null;
 }
+
+/**
+ * Extract the AccessPass object ID from a purchase_access transaction result.
+ */
+export async function getAccessPassIdFromTx(
+  digest: string,
+): Promise<string | null> {
+  const network =
+    process.env.NEXT_PUBLIC_SUI_NETWORK ??
+    process.env.VITE_SUI_NETWORK ??
+    "testnet";
+  const client = new SuiClient({
+    url: getFullnodeUrl(
+      network as "mainnet" | "testnet" | "devnet" | "localnet",
+    ),
+  });
+  const tx = await client.getTransactionBlock({
+    digest,
+    options: { showObjectChanges: true },
+  });
+
+  const changes = tx.objectChanges;
+  if (!Array.isArray(changes)) return null;
+
+  for (const change of changes) {
+    if (change.type === "created" && change.objectId && change.objectType) {
+      if (change.objectType.includes("AccessPass")) {
+        return change.objectId;
+      }
+    }
+  }
+  return null;
+}

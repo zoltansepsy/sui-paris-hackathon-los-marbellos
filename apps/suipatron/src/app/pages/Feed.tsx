@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useAccessPasses } from "../lib/access-pass";
+import { getSubscriptionStatus } from "../lib/subscription-utils";
 import {
   Card,
   CardContent,
@@ -15,11 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { ContentCard } from "../components/ContentCard";
 import { mockCreators, mockContent } from "../lib/mock-data";
-import { Heart } from "lucide-react";
+import { Heart, Clock } from "lucide-react";
 
 export function Feed() {
   const { user } = useAuth();
-  const { accessPasses } = useAccessPasses(user?.id);
+  const { entries, getEntry } = useAccessPasses(user?.id);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -46,8 +47,10 @@ export function Feed() {
     );
   }
 
+  // Include all creators with an access pass entry (even expired — they show with badges)
+  const supportedCreatorIds = entries.map((e) => e.creatorId);
   const supportedCreators = mockCreators.filter((c) =>
-    accessPasses.includes(c.id),
+    supportedCreatorIds.includes(c.id),
   );
 
   const feedContent = supportedCreators
@@ -117,26 +120,52 @@ export function Feed() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4">
-                {supportedCreators.map((creator) => (
-                  <Link key={creator.id} href={`/creator/${creator.id}`}>
-                    <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={creator.avatar} alt={creator.name} />
-                        <AvatarFallback>
-                          {creator.name.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">{creator.name}</p>
-                        {creator.suinsName && (
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            {creator.suinsName}
+                {supportedCreators.map((creator) => {
+                  const entry = getEntry(creator.id);
+                  const status = entry
+                    ? getSubscriptionStatus(entry.expiresAt)
+                    : null;
+                  return (
+                    <Link key={creator.id} href={`/creator/${creator.id}`}>
+                      <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage
+                            src={creator.avatar}
+                            alt={creator.name}
+                          />
+                          <AvatarFallback>
+                            {creator.name.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{creator.name}</p>
+                          {creator.suinsName && (
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              {creator.suinsName}
+                            </Badge>
+                          )}
+                        </div>
+                        {status === "expiring" && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-amber-600 border-amber-300"
+                          >
+                            <Clock className="h-3 w-3 mr-1" />
+                            Expiring
+                          </Badge>
+                        )}
+                        {status === "expired" && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-red-600 border-red-300"
+                          >
+                            Expired
                           </Badge>
                         )}
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -147,27 +176,37 @@ export function Feed() {
 
             {feedContent.length > 0 ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {feedContent.map((item) => (
-                  <div key={item.id} className="space-y-3">
-                    <Link href={`/creator/${item.creator.id}`}>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage
-                            src={item.creator.avatar}
-                            alt={item.creator.name}
-                          />
-                          <AvatarFallback className="text-xs">
-                            {item.creator.name.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium hover:underline">
-                          {item.creator.name}
-                        </span>
-                      </div>
-                    </Link>
-                    <ContentCard content={item} isLocked={false} />
-                  </div>
-                ))}
+                {feedContent.map((item) => {
+                  const entry = getEntry(item.creator.id);
+                  const expiryStatus = entry
+                    ? getSubscriptionStatus(entry.expiresAt)
+                    : null;
+                  return (
+                    <div key={item.id} className="space-y-3">
+                      <Link href={`/creator/${item.creator.id}`}>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage
+                              src={item.creator.avatar}
+                              alt={item.creator.name}
+                            />
+                            <AvatarFallback className="text-xs">
+                              {item.creator.name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium hover:underline">
+                            {item.creator.name}
+                          </span>
+                        </div>
+                      </Link>
+                      <ContentCard
+                        content={item}
+                        isLocked={false}
+                        expiryStatus={expiryStatus}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12">

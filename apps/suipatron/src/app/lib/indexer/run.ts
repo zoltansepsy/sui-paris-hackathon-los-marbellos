@@ -311,8 +311,15 @@ export async function runIndexer(): Promise<{
               registeredAt: num(pick(parsed, "timestamp")),
             });
             processed++;
+          } else if (eventType === "SubscriptionRenewed") {
+            const accessPassId = str(pick(parsed, "access_pass_id"));
+            const newExpiresAt = num(pick(parsed, "new_expires_at"));
+            if (accessPassId && newExpiresAt) {
+              await store.updateAccessPassExpiry(accessPassId, newExpiresAt);
+            }
+            processed++;
           }
-          // EarningsWithdrawn, TipReceived, SubscriptionRenewed: logged but no store update needed
+          // EarningsWithdrawn, TipReceived: logged but no store update needed
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           errors.push(`${eventType} ${id}: ${msg}`);

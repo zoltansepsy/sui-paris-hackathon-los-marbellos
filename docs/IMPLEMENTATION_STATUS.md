@@ -134,6 +134,60 @@ All frontend service-layer code updated from Phase 1 flat-price model to Phase 2
 - `CreatorProfile.tsx` — shows tier count and lowest price in support CTA
 - `Dashboard.tsx` — displays tiers list instead of flat price input, `handleBecomeCreator` creates default tier
 
+### Service Layer — Subscription Tiers Frontend
+
+Completed the remaining subscription tier gaps. On branch `zoltan/phase-2`.
+
+**Access pass hook** (`src/app/lib/access-pass.ts`):
+- `AccessPassEntry` gained `accessPassId: string | null` for on-chain object tracking
+- `addAccessPass()` now handles same-tier renewal (updates `expiresAt` instead of silently ignoring)
+- Added `getEntry(creatorId)` helper for component use
+- Backward-compatible migration from entries without `accessPassId`
+
+**Transaction utilities** (`src/app/lib/get-created-objects.ts`):
+- Added `getAccessPassIdFromTx(digest)` — extracts AccessPass object ID from purchase transaction results
+
+**Subscription utilities** (`src/app/lib/subscription-utils.ts` — new file):
+- `getSubscriptionStatus(expiresAt)` — returns `"active" | "expiring" | "expired" | "permanent"` (3-day threshold)
+- `formatExpiry(expiresAt)` — human-readable remaining time ("Expires in 5d", "Expired")
+- `formatExpiryDate(expiresAt)` — formatted date string
+
+**Indexer — SubscriptionRenewed persistence:**
+- `IndexerStore.updateAccessPassExpiry(accessPassId, newExpiresAt)` added to interface
+- In-memory store: scans `purchasesByProfile` maps to find and update the entry
+- Supabase store: SQL UPDATE on `indexer_access_purchases` by `access_pass_id`
+- New migration: `supabase/migrations/20250214300000_access_pass_unique.sql` — UNIQUE index on `access_pass_id`
+- Indexer `run.ts`: `SubscriptionRenewed` event now persisted (extracts `access_pass_id` + `new_expires_at`)
+
+**CreateProfileForm** (`src/app/components/CreateProfileForm.tsx`):
+- Added duration selector dropdown: Permanent, 7d, 30d, 90d, 365d
+- `durationMs` computed from selection and passed to `buildCreateProfileTx`
+
+**SupportModal** (`src/app/components/SupportModal.tsx`):
+- Added `renewMode` prop for subscription renewal flow
+- Purchase flow: extracts `accessPassId` from tx result via `getAccessPassIdFromTx`
+- Renewal flow: calls `buildRenewSubscriptionTx`, computes smart expiry extension (stacking)
+- UI: "Renew Subscription" title, locked tier selector, current→new expiry display
+- Both `SupportModalWithSponsor` and `SupportModalMock` variants updated
+
+**ContentCard** (`src/app/components/ContentCard.tsx`):
+- Added optional `expiryStatus` prop
+- Shows amber "Expiring Soon" badge (with Clock icon) or red "Expired" badge
+
+**CreatorProfile** (`src/app/pages/CreatorProfile.tsx`):
+- Expiry-aware access banner: green (active/permanent), amber (expiring), red (expired)
+- "Renew Subscription" button for expired/expiring passes
+- Passes `renewMode` and `expiryStatus` to child components
+
+**Feed** (`src/app/pages/Feed.tsx`):
+- Uses `entries` instead of `accessPasses` for expiry-aware creator filtering
+- Shows expiry badges next to creator names in "Creators You Support" section
+- Passes `expiryStatus` to ContentCard for each feed item
+
+**Landing page** (`src/app/pages/Landing.tsx`):
+- Updated hero text from "permanent access only" to "flexible access"
+- Updated "Permanent Access" value prop to "Flexible Access" with subscription mention
+
 ### Service Layer — Creator Registry
 
 Full service layer for the Creator Registry (handle→profile lookups). On branch `zoltan/phase-2`.
@@ -560,4 +614,4 @@ cd apps/suipatron && pnpm dev
 
 ---
 
-*Last updated: Creator Registry service layer added on branch `zoltan/phase-2`. IndexedHandle type, both stores (in-memory + Supabase), indexer HandleRegistered event processing, registry service (lookupHandle, getCreatorByHandle, getHandleForCreator), GET /api/registry/:handle route, handle validation schema, Supabase migration. Previous: Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*
+*Last updated: Subscription Tiers frontend completion on branch `zoltan/phase-2`. Added renewal UI (SupportModal renewMode), expiry display (subscription-utils.ts), expiry-aware access banners (CreatorProfile green/amber/red), ContentCard expiry badges, Feed expiry filtering, CreateProfileForm duration selector, accessPassId tracking in access-pass hook, getAccessPassIdFromTx utility, indexer SubscriptionRenewed event persistence (both stores + migration). Previous: Creator Registry service layer, Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*

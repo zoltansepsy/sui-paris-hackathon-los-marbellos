@@ -309,6 +309,14 @@ export function createSupabaseStore(): IndexerStore {
       return rowToHandle(data as HandleRow);
     },
 
+    async updateAccessPassExpiry(accessPassId: string, newExpiresAt: number) {
+      const supabase = getClient();
+      await supabase
+        .from("indexer_access_purchases")
+        .update({ expires_at: newExpiresAt })
+        .eq("access_pass_id", accessPassId);
+    },
+
     async getLastCursor(eventType: string): Promise<string | undefined> {
       const supabase = getClient();
       const { data } = await supabase

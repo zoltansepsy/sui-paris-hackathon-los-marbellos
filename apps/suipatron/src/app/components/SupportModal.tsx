@@ -6,7 +6,9 @@ import { useAuth } from "../lib/auth-context";
 import { useAccessPasses } from "../lib/access-pass";
 import { useSponsorTransaction } from "../lib/use-sponsor-transaction";
 import { isEnokiConfigured } from "../lib/enoki-provider";
-import { buildPurchaseAccessTx } from "../lib/ptb";
+import { buildPurchaseAccessTx, buildRenewSubscriptionTx } from "../lib/ptb";
+import { getAccessPassIdFromTx } from "../lib/get-created-objects";
+import { formatExpiryDate } from "../lib/subscription-utils";
 import {
   Dialog,
   DialogContent,
@@ -25,20 +27,35 @@ import { Loader2 } from "lucide-react";
 
 const SUI_TO_MIST = BigInt(1000000000);
 
+interface RenewMode {
+  accessPassId: string;
+  tierLevel: number;
+  currentExpiresAt: number | null;
+}
+
 interface SupportModalProps {
   creator: Creator;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  renewMode?: RenewMode;
 }
 
 function SupportModalWithSponsor(props: SupportModalProps) {
-  const { creator, open, onOpenChange, onSuccess } = props;
+  const { creator, open, onOpenChange, onSuccess, renewMode } = props;
   const { user } = useAuth();
   const { addAccessPass } = useAccessPasses(user?.id);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
+  const [selectedTierIndex, setSelectedTierIndex] = useState(() => {
+    if (renewMode) {
+      const idx = creator.tiers.findIndex(
+        (t) => t.tierLevel === renewMode.tierLevel,
+      );
+      return idx >= 0 ? idx : 0;
+    }
+    return 0;
+  });
   const sponsorTx = useSponsorTransaction();
 
   const tiers = creator.tiers;
@@ -58,18 +75,56 @@ function SupportModalWithSponsor(props: SupportModalProps) {
       const priceMist = BigInt(
         Math.round(selectedTier.price * Number(SUI_TO_MIST)),
       );
-      await sponsorTx.execute({
-        buildTx: () =>
-          buildPurchaseAccessTx(creator.id, selectedTierIndex, priceMist),
-        getSender: async () => user.id,
-      });
-      addAccessPass(
-        creator.id,
-        selectedTier.tierLevel,
-        selectedTier.durationMs ? Date.now() + selectedTier.durationMs : null,
-      );
-      onOpenChange(false);
-      toast.success("Access granted! You can now view content at this tier.");
+
+      if (renewMode) {
+        // RENEWAL flow
+        await sponsorTx.execute({
+          buildTx: () =>
+            buildRenewSubscriptionTx(
+              creator.id,
+              renewMode.accessPassId,
+              priceMist,
+            ),
+          getSender: async () => user.id,
+        });
+        // Smart expiry extension (matches Move contract logic)
+        const now = Date.now();
+        const base =
+          renewMode.currentExpiresAt && renewMode.currentExpiresAt > now
+            ? renewMode.currentExpiresAt
+            : now;
+        const newExpiresAt = selectedTier.durationMs
+          ? base + selectedTier.durationMs
+          : null;
+        addAccessPass(
+          creator.id,
+          renewMode.tierLevel,
+          newExpiresAt,
+          renewMode.accessPassId,
+        );
+        onOpenChange(false);
+        toast.success("Subscription renewed!");
+      } else {
+        // PURCHASE flow
+        const { digest } = await sponsorTx.execute({
+          buildTx: () =>
+            buildPurchaseAccessTx(creator.id, selectedTierIndex, priceMist),
+          getSender: async () => user.id,
+        });
+        // Extract AccessPass ID from transaction result
+        let passId: string | null = null;
+        try {
+          passId = await getAccessPassIdFromTx(digest);
+        } catch {
+          // Non-critical: passId will be null
+        }
+        const expiresAt = selectedTier.durationMs
+          ? Date.now() + selectedTier.durationMs
+          : null;
+        addAccessPass(creator.id, selectedTier.tierLevel, expiresAt, passId);
+        onOpenChange(false);
+        toast.success("Access granted! You can now view content at this tier.");
+      }
       onSuccess?.();
     } catch (e) {
       toast.error(
@@ -82,12 +137,36 @@ function SupportModalWithSponsor(props: SupportModalProps) {
     }
   };
 
+  const isRenew = !!renewMode;
+  const renewTier = isRenew
+    ? tiers.find((t) => t.tierLevel === renewMode!.tierLevel)
+    : null;
+
+  // For renewal mode, compute the projected new expiry
+  const projectedExpiry =
+    isRenew && renewTier?.durationMs
+      ? (() => {
+          const now = Date.now();
+          const base =
+            renewMode!.currentExpiresAt && renewMode!.currentExpiresAt > now
+              ? renewMode!.currentExpiresAt
+              : now;
+          return base + renewTier.durationMs;
+        })()
+      : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Support Creator</DialogTitle>
-          <DialogDescription>Choose a tier to unlock content</DialogDescription>
+          <DialogTitle>
+            {isRenew ? "Renew Subscription" : "Support Creator"}
+          </DialogTitle>
+          <DialogDescription>
+            {isRenew
+              ? "Extend your subscription access"
+              : "Choose a tier to unlock content"}
+          </DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-4 py-4">
           <Avatar className="h-16 w-16">
@@ -106,7 +185,7 @@ function SupportModalWithSponsor(props: SupportModalProps) {
           </div>
         </div>
 
-        {tiers.length > 1 && (
+        {!isRenew && tiers.length > 1 && (
           <div className="space-y-3 py-2">
             <Label>Select a Tier</Label>
             <div className="space-y-2">
@@ -147,20 +226,45 @@ function SupportModalWithSponsor(props: SupportModalProps) {
               Payment amount
             </span>
             <span className="font-semibold text-lg">
-              {selectedTier?.price ?? 0} SUI
+              {isRenew ? (renewTier?.price ?? 0) : (selectedTier?.price ?? 0)}{" "}
+              SUI
             </span>
           </div>
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Tier</span>
-              <span className="font-medium">{selectedTier?.name ?? "—"}</span>
+              <span className="font-medium">
+                {isRenew
+                  ? (renewTier?.name ?? "—")
+                  : (selectedTier?.name ?? "—")}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Access type</span>
               <span className="font-medium">
-                {selectedTier?.durationMs ? "Subscription" : "Permanent"}
+                {isRenew
+                  ? "Subscription renewal"
+                  : selectedTier?.durationMs
+                    ? "Subscription"
+                    : "Permanent"}
               </span>
             </div>
+            {isRenew && renewMode!.currentExpiresAt && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Current expiry</span>
+                <span className="font-medium text-red-600">
+                  {formatExpiryDate(renewMode!.currentExpiresAt)}
+                </span>
+              </div>
+            )}
+            {isRenew && projectedExpiry && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">New expiry</span>
+                <span className="font-medium text-green-600">
+                  {formatExpiryDate(projectedExpiry)}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Platform fee</span>
               <span className="font-medium text-green-600">0%</span>
@@ -185,6 +289,8 @@ function SupportModalWithSponsor(props: SupportModalProps) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
               </>
+            ) : isRenew ? (
+              `Renew for ${renewTier?.price ?? 0} SUI`
             ) : (
               `Support for ${selectedTier?.price ?? 0} SUI`
             )}
@@ -196,12 +302,20 @@ function SupportModalWithSponsor(props: SupportModalProps) {
 }
 
 function SupportModalMock(props: SupportModalProps) {
-  const { creator, open, onOpenChange, onSuccess } = props;
+  const { creator, open, onOpenChange, onSuccess, renewMode } = props;
   const { user } = useAuth();
   const { addAccessPass } = useAccessPasses(user?.id);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
+  const [selectedTierIndex, setSelectedTierIndex] = useState(() => {
+    if (renewMode) {
+      const idx = creator.tiers.findIndex(
+        (t) => t.tierLevel === renewMode.tierLevel,
+      );
+      return idx >= 0 ? idx : 0;
+    }
+    return 0;
+  });
 
   const tiers = creator.tiers;
   const selectedTier = tiers[selectedTierIndex];
@@ -215,23 +329,68 @@ function SupportModalMock(props: SupportModalProps) {
     if (!selectedTier) return;
     setIsProcessing(true);
     await new Promise((r) => setTimeout(r, 2000));
-    addAccessPass(
-      creator.id,
-      selectedTier.tierLevel,
-      selectedTier.durationMs ? Date.now() + selectedTier.durationMs : null,
-    );
+
+    if (renewMode) {
+      // RENEWAL flow (mock)
+      const now = Date.now();
+      const base =
+        renewMode.currentExpiresAt && renewMode.currentExpiresAt > now
+          ? renewMode.currentExpiresAt
+          : now;
+      const newExpiresAt = selectedTier.durationMs
+        ? base + selectedTier.durationMs
+        : null;
+      addAccessPass(
+        creator.id,
+        renewMode.tierLevel,
+        newExpiresAt,
+        renewMode.accessPassId,
+      );
+      toast.success("Subscription renewed!");
+    } else {
+      // PURCHASE flow (mock)
+      const mockPassId = `mock_pass_${Date.now()}`;
+      const expiresAt = selectedTier.durationMs
+        ? Date.now() + selectedTier.durationMs
+        : null;
+      addAccessPass(creator.id, selectedTier.tierLevel, expiresAt, mockPassId);
+      toast.success("Access granted! You can now view content at this tier.");
+    }
+
     setIsProcessing(false);
     onOpenChange(false);
-    toast.success("Access granted! You can now view content at this tier.");
     onSuccess?.();
   };
+
+  const isRenew = !!renewMode;
+  const renewTier = isRenew
+    ? tiers.find((t) => t.tierLevel === renewMode!.tierLevel)
+    : null;
+
+  const projectedExpiry =
+    isRenew && renewTier?.durationMs
+      ? (() => {
+          const now = Date.now();
+          const base =
+            renewMode!.currentExpiresAt && renewMode!.currentExpiresAt > now
+              ? renewMode!.currentExpiresAt
+              : now;
+          return base + renewTier.durationMs;
+        })()
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Support Creator</DialogTitle>
-          <DialogDescription>Choose a tier to unlock content</DialogDescription>
+          <DialogTitle>
+            {isRenew ? "Renew Subscription" : "Support Creator"}
+          </DialogTitle>
+          <DialogDescription>
+            {isRenew
+              ? "Extend your subscription access"
+              : "Choose a tier to unlock content"}
+          </DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-4 py-4">
           <Avatar className="h-16 w-16">
@@ -250,7 +409,7 @@ function SupportModalMock(props: SupportModalProps) {
           </div>
         </div>
 
-        {tiers.length > 1 && (
+        {!isRenew && tiers.length > 1 && (
           <div className="space-y-3 py-2">
             <Label>Select a Tier</Label>
             <div className="space-y-2">
@@ -291,20 +450,45 @@ function SupportModalMock(props: SupportModalProps) {
               Payment amount
             </span>
             <span className="font-semibold text-lg">
-              {selectedTier?.price ?? 0} SUI
+              {isRenew ? (renewTier?.price ?? 0) : (selectedTier?.price ?? 0)}{" "}
+              SUI
             </span>
           </div>
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Tier</span>
-              <span className="font-medium">{selectedTier?.name ?? "—"}</span>
+              <span className="font-medium">
+                {isRenew
+                  ? (renewTier?.name ?? "—")
+                  : (selectedTier?.name ?? "—")}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Access type</span>
               <span className="font-medium">
-                {selectedTier?.durationMs ? "Subscription" : "Permanent"}
+                {isRenew
+                  ? "Subscription renewal"
+                  : selectedTier?.durationMs
+                    ? "Subscription"
+                    : "Permanent"}
               </span>
             </div>
+            {isRenew && renewMode!.currentExpiresAt && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Current expiry</span>
+                <span className="font-medium text-red-600">
+                  {formatExpiryDate(renewMode!.currentExpiresAt)}
+                </span>
+              </div>
+            )}
+            {isRenew && projectedExpiry && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">New expiry</span>
+                <span className="font-medium text-green-600">
+                  {formatExpiryDate(projectedExpiry)}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Platform fee</span>
               <span className="font-medium text-green-600">0%</span>
@@ -329,6 +513,8 @@ function SupportModalMock(props: SupportModalProps) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
               </>
+            ) : isRenew ? (
+              `Renew for ${renewTier?.price ?? 0} SUI`
             ) : (
               `Support for ${selectedTier?.price ?? 0} SUI`
             )}

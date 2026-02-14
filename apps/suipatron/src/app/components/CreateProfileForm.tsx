@@ -9,6 +9,13 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -25,6 +32,7 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
   );
   const [tierPrice, setTierPrice] = useState("5");
   const [tierLevel, setTierLevel] = useState("1");
+  const [duration, setDuration] = useState("permanent");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +43,8 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
         Math.round(parseFloat(tierPrice || "0") * Number(SUI_TO_MIST)),
       );
       const level = parseInt(tierLevel) || 1;
+      const durationMs =
+        duration === "permanent" ? null : BigInt(parseInt(duration) * 86400000);
       const { digest } = await sponsorTx.execute({
         buildTx: () =>
           buildCreateProfileTx(
@@ -44,7 +54,7 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
             tierDescription,
             priceMist,
             level,
-            null, // permanent (no duration)
+            durationMs,
           ),
         getSender: async () => user.id,
       });
@@ -55,7 +65,8 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
         description: tierDescription,
         price: parseFloat(tierPrice) || 5,
         tierLevel: level,
-        durationMs: null,
+        durationMs:
+          duration === "permanent" ? null : parseInt(duration) * 86400000,
       };
       if (created) {
         updateUser({
@@ -149,6 +160,26 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) => setTierDescription(e.target.value)}
             placeholder="What supporters get at this tier"
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="create-tier-duration">Access Duration</Label>
+          <Select value={duration} onValueChange={setDuration}>
+            <SelectTrigger id="create-tier-duration">
+              <SelectValue placeholder="Select duration" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="permanent">Permanent (one-time)</SelectItem>
+              <SelectItem value="7">7 days</SelectItem>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+              <SelectItem value="365">365 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {duration === "permanent"
+              ? "Supporters pay once for permanent access"
+              : `Supporters pay every ${duration} days to maintain access`}
+          </p>
         </div>
         <input type="hidden" value={tierLevel} />
         <p className="text-xs text-muted-foreground">
