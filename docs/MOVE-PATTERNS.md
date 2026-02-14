@@ -92,4 +92,4 @@ sui move test
 sui client publish --gas-budget 100000000
 ```
 
-After publish, add Package ID and object IDs to `packages/blockchain/sdk/networkConfig.ts` (and optionally `apps/dapp/.env.local`).
+After publish, add Package ID and object IDs to `packages/blockchain/sdk/networkConfig.ts` (and optionally `apps/suipatron/.env.local`).

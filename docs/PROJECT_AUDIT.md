@@ -17,7 +17,7 @@
 
 **Monorepo layout:**
 - **Root:** Turborepo; `pnpm`; Husky + lint-staged; `check:patterns` in pre-commit.
-- **Apps:** `apps/suipatron` (SuiPatron), `apps/dapp` (skeleton).
+- **Apps:** `apps/suipatron` (SuiPatron).
 - **Packages:** `packages/blockchain` (Move contracts + TS SDK), `packages/ui`, `packages/types`.
 
 ---
