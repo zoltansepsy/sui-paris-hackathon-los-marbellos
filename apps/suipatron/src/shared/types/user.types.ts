@@ -4,6 +4,8 @@
  */
 
 export interface CreatorProfile {
+  profileId?: string;
+  creatorCapId?: string;
   bio?: string;
   price?: number;
   balance?: number;
