@@ -37,7 +37,7 @@ export function ContentCard({
       download(blobId)
         .then((bytes) => {
           // For images, create blob URL directly
-          const blob = new Blob([bytes]);
+          const blob = new Blob([new Uint8Array(bytes)]);
           const url = URL.createObjectURL(blob);
           setBlobUrl(url);
         })

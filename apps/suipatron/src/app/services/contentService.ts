@@ -75,7 +75,7 @@ export class ContentService {
     creatorProfileId: string,
     creatorCapId: string,
     signAndExecute: (tx: {
-      transaction: string;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
@@ -90,7 +90,10 @@ export class ContentService {
       fileBytes,
     );
     console.log("🔒 SEAL: Encrypted size:", encryptedObject.length, "bytes");
-    console.log("🔒 SEAL: Using identity (creator profile ID):", creatorProfileId);
+    console.log(
+      "🔒 SEAL: Using identity (creator profile ID):",
+      creatorProfileId,
+    );
 
     // Step 3: Upload to Walrus
     const blobId = await this.walrusService.uploadEncryptedContent(
@@ -152,7 +155,7 @@ export class ContentService {
     creatorProfileId: string,
     creatorCapId: string,
     signAndExecute: (tx: {
-      transaction: string;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
@@ -188,11 +191,18 @@ export class ContentService {
    */
   async uploadAvatar(
     file: File,
-    signer: Signer,
+    signAndExecute: (tx: {
+      transaction: import("@mysten/sui/transactions").Transaction;
+      options?: Record<string, unknown>;
+    }) => Promise<{ digest: string }>,
     ownerAddress?: string,
   ): Promise<string> {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    return this.walrusService.uploadPublicFile(bytes, signer, ownerAddress);
+    return this.walrusService.uploadPublicFile(
+      bytes,
+      signAndExecute,
+      ownerAddress ?? "",
+    );
   }
 
   /**
@@ -232,7 +242,7 @@ export class ContentService {
     creatorProfileId: string,
     creatorCapId: string,
     signAndExecute: (tx: {
-      transaction: string;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,

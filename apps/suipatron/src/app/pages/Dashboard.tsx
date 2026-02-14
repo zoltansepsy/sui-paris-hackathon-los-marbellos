@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import { isEnokiConfigured } from "../lib/enoki-provider";
+import { CreateProfileForm } from "../components/CreateProfileForm";
 import {
   useMyCreatorProfile,
   useMyCreatorCap,
@@ -283,9 +285,17 @@ export function Dashboard() {
               </div>
             </div>
 
-            <Button onClick={handleBecomeCreator} size="lg" className="w-full">
-              Set Up Creator Profile
-            </Button>
+            {isEnokiConfigured ? (
+              <CreateProfileForm onSuccess={() => {}} />
+            ) : (
+              <Button
+                onClick={handleBecomeCreator}
+                size="lg"
+                className="w-full"
+              >
+                Set Up Creator Profile
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

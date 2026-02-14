@@ -13,10 +13,10 @@ All core Move contracts are implemented, built, and tested. **18/18 unit tests p
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `move/suipatron/Move.toml` | ~5 | Package manifest (edition 2024.beta) |
-| `move/suipatron/sources/suipatron.move` | ~420 | Core module |
-| `move/suipatron/sources/seal_policy.move` | ~53 | SEAL access control |
-| `move/suipatron/tests/suipatron_tests.move` | ~400 | 18 unit tests across 8 categories |
+| `packages/blockchain/contracts/Move.toml` | ~5 | Package manifest (edition 2024.beta) |
+| `packages/blockchain/contracts/sources/suipatron.move` | ~420 | Core module |
+| `packages/blockchain/contracts/sources/seal_policy.move` | ~53 | SEAL access control |
+| `packages/blockchain/contracts/tests/suipatron_tests.move` | ~400 | 18 unit tests across 8 categories |
 
 **Types implemented:**
 - `Platform` — shared singleton, created at package publish (OTW pattern)
@@ -121,6 +121,15 @@ Complete service layer bridging Move contracts and React UI. All files type-chec
 
 ### 1. Contract Deployment — Post-deploy Tasks
 
+Deploy the Move package to SUI Testnet and record object IDs.
+
+```bash
+cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
+```
+
+After publishing, record:
+- [ ] Package ID → `NEXT_PUBLIC_PACKAGE_ID` (or `VITE_PACKAGE_ID`) in `apps/suipatron/.env`
+- [ ] Platform object ID → `NEXT_PUBLIC_PLATFORM_ID` (or `VITE_PLATFORM_ID`) in `apps/suipatron/.env`
 - [ ] AdminCap object ID (keep safe, not in env)
 - [ ] Update Enoki Portal with new Package ID in allowed move call targets
 - [ ] Smoke test via CLI: `sui client call --package {PKG} --module suipatron --function create_profile ...`
@@ -128,34 +137,56 @@ Complete service layer bridging Move contracts and React UI. All files type-chec
 ### 2. Frontend Scaffold (Z1, J1–J4)
 
 - [x] Install SUI SDKs: `@mysten/sui`, `@mysten/dapp-kit`, `@mysten/enoki`, `@mysten/seal`, `@mysten/walrus`
+- [x] Next.js app in `apps/suipatron/` — design system, layout, landing, explore
+- [ ] Wire Explore to `GET /api/creators` (currently uses mock data)
 - [ ] Design system components: Button, Card, Modal, Badge, Toast, Avatar, LoadingSpinner, EmptyState
-- [ ] Layout shell: Header with nav, responsive main content area
-- [ ] Landing page (`/`) — hero, value prop, "Sign in with Google" CTA
+- [ ] Landing page (`/`) — hero, value prop, "Sign in with Google" / wallet CTA
 - [ ] Explore page (`/explore`) — creator grid (mock data initially)
 
 ### 3. Auth / Enoki zkLogin (P1–P2, Z4)
 
 - [ ] Set up Enoki Portal: create app, add Google OAuth client ID, set redirect URLs
-- [ ] Configure `VITE_ENOKI_PUBLIC_KEY` and `VITE_GOOGLE_CLIENT_ID`
-- [ ] Implement Google sign-in flow using `@mysten/enoki/react` (`useEnokiFlow`)
-- [ ] Auth callback handler (`/auth/callback`) — process Enoki redirect, establish session
-- [ ] Auth context/provider wrapping the app
+- [ ] Configure `NEXT_PUBLIC_ENOKI_PUBLIC_KEY` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+- [x] Implement Google sign-in flow using `@mysten/enoki/react` (`useEnokiFlow`) — **apps/suipatron**: `src/app/lib/auth-context.tsx`, `enoki-provider.tsx`
+- [x] Auth callback handler (`/auth/callback`) — process Enoki redirect, establish session — **apps/suipatron**: `src/app/pages/AuthCallback.tsx`
+- [x] Auth context/provider wrapping the app
 - [ ] Protected routes (dashboard requires auth)
 
 ### 4. Backend / Serverless Functions (A10–A12)
 
-- [ ] `POST /api/sponsor` — accept transaction bytes, sponsor via Enoki private API
-- [ ] `POST /api/sponsor/execute` — execute previously sponsored transaction
+- [x] `POST /api/sponsor` — accept transaction bytes, sponsor via Enoki private API — **apps/suipatron**: `src/app/api/sponsor/route.ts`
+- [x] `POST /api/sponsor/execute` — execute previously sponsored transaction — **apps/suipatron**: `src/app/api/sponsor/execute/route.ts`
 - [ ] `POST /api/subname` — create SuiNS subname for authenticated creator
 - [x] `GET /api/creators` — list creator profiles (from indexer) — **apps/suipatron**: `src/app/api/creators/route.ts`
 - [x] `GET /api/creator/:id` — get creator profile + content list — **apps/suipatron**: `src/app/api/creator/[id]/route.ts`
 - [x] Event indexer — poll SUI events, build queryable state — **apps/suipatron**: `src/app/lib/indexer/` (store, run, types); trigger via `GET /api/events` (cron)
 - [x] **Indexer store: Supabase** — Persistent store when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set; otherwise in-memory (dev). **apps/suipatron**: `src/app/lib/indexer/store-supabase.ts`, `get-store.ts`; schema in `supabase/migrations/20250214000000_indexer_tables.sql`. See `docs/suipatron/INDEXER-SUPABASE-ANALYSIS.md`.
 
-### 5. Integration — Remaining Items
+### 5. Integration Hooks / Services (P3–P14)
 
-Sponsored transaction flow:
-- [ ] Wire up Enoki `sponsorAndExecuteTransaction` for all user actions
+PTB builders (transaction construction):
+- [x] `buildCreateProfileTx(name, bio, price)` — creates CreatorProfile + CreatorCap — **apps/suipatron**: `src/app/lib/ptb/index.ts`
+- [x] `buildUpdateProfileTx(profileId, creatorCapId, updates)` — updates profile metadata
+- [x] `buildPublishContentTx(profileId, creatorCapId, title, desc, blobId, contentType)` — publishes content
+- [x] `buildPurchaseAccessTx(profileId, price)` — purchases access + mints AccessPass
+- [x] `buildWithdrawEarningsTx(profileId, creatorCapId)` — withdraws creator earnings
+
+SEAL integration:
+- [x] SEAL encrypt/decrypt — **apps/suipatron**: content upload and viewer
+- [ ] `decryptContent(encryptedData, accessPass, sessionKey)` — SEAL decrypt via seal_approve (when needed)
+
+Walrus integration:
+- [x] `uploadToWalrus` / bundled upload — **apps/suipatron**: hooks and PTB
+- [x] `downloadFromWalrus(blobId)` — retrieve encrypted blob
+
+Integration — remaining items:
+- [x] Wallet sign+execute for create profile, purchase access, withdraw
+- [x] Content upload (bundled PTB), feed, encrypted viewer
+
+Sponsored transaction flow (optional, when Enoki configured):
+- [x] Wire up Enoki sponsor flow (build → sponsor → sign → execute) — **apps/suipatron**: `src/app/lib/sponsor-flow.ts`, `use-sponsor-transaction.ts`
+- [x] Dashboard: create profile, withdraw — **CreateProfileForm.tsx**, **WithdrawButton.tsx**
+- [x] SupportModal: purchase access
 
 ### 6. UI Pages (J5–J13)
 
@@ -339,9 +370,16 @@ See `CLAUDE.md` for full environment variable reference. Quick start:
 # 1. Build and test contracts
 cd packages/blockchain/contracts && sui move build && sui move test
 
-# 2. Start the dapp (monorepo)
+# 2. Deploy to testnet (when ready)
+sui client publish --gas-budget 200000000
+
+# 3. Record Package ID and Platform ID from publish output
+
+# 4. Set up frontend (monorepo)
 pnpm install
-pnpm --filter @hack/dapp dev
+cd apps/suipatron && pnpm dev
+# Or from root: pnpm dev
+# Copy .env.example to apps/suipatron, fill in NEXT_PUBLIC_PACKAGE_ID, NEXT_PUBLIC_PLATFORM_ID, etc.
 ```
 
 ---

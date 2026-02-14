@@ -21,6 +21,8 @@ import { MIST_PER_SUI } from "../constants";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
+const SUI_TO_MIST = BigInt(1000000000);
+
 interface SupportModalProps {
   creator: Creator;
   open: boolean;
@@ -84,7 +86,6 @@ export function SupportModal({
             One-time payment for permanent access to all content
           </DialogDescription>
         </DialogHeader>
-
         <div className="flex items-center space-x-4 py-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={creator.avatar} alt={creator.name} />
@@ -92,7 +93,6 @@ export function SupportModal({
               {creator.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-
           <div className="flex-1 space-y-1">
             <h3 className="font-semibold">{creator.name}</h3>
             {creator.suinsName && (
@@ -102,7 +102,6 @@ export function SupportModal({
             )}
           </div>
         </div>
-
         <div className="space-y-4 py-4 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
@@ -110,7 +109,6 @@ export function SupportModal({
             </span>
             <span className="font-semibold text-lg">{creator.price} SUI</span>
           </div>
-
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Content unlocked</span>
@@ -125,13 +123,11 @@ export function SupportModal({
               <span className="font-medium text-green-600">0%</span>
             </div>
           </div>
-
           <p className="text-xs text-muted-foreground">
             You&apos;ll need SUI in your account to complete this. No additional
             gas fees required.
           </p>
         </div>
-
         <DialogFooter>
           <Button
             variant="outline"

@@ -9,7 +9,7 @@
 
 import { WalrusClient } from "@mysten/walrus";
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import type { Signer } from "@mysten/sui/cryptography";
+import type { Transaction } from "@mysten/sui/transactions";
 import {
   WALRUS_AGGREGATOR_URL_TESTNET,
   WALRUS_UPLOAD_RELAY_TESTNET,
@@ -53,7 +53,7 @@ export class WalrusService {
   async uploadEncryptedContent(
     encryptedBytes: Uint8Array,
     signAndExecute: (tx: {
-      transaction: any;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
@@ -108,7 +108,7 @@ export class WalrusService {
   async uploadPublicFile(
     data: Uint8Array,
     signAndExecute: (tx: {
-      transaction: any;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
@@ -168,11 +168,11 @@ export class WalrusService {
   async uploadFileReturnCertifyTx(
     data: Uint8Array,
     signAndExecute: (tx: {
-      transaction: any;
+      transaction: Transaction;
       options?: Record<string, unknown>;
     }) => Promise<{ digest: string }>,
     ownerAddress: string,
-  ): Promise<{ blobId: string; certifyTx: any }> {
+  ): Promise<{ blobId: string; certifyTx: Transaction }> {
     const client = this.ensureClient();
 
     const flow = client.writeBlobFlow({ blob: data });
