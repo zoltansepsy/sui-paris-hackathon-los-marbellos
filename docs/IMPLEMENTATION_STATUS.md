@@ -49,7 +49,10 @@ All core Move contracts are implemented, built, and tested. **18/18 unit tests p
 | File | Description |
 |------|-------------|
 | `docs/SCOPE.md` | Full project specification (1387 lines) — product vision, architecture, all specs |
-| `docs/SMART_CONTRACT_IMPLEMENTATION_PLAN.md` | Contract implementation guide with code-level detail |
+| `docs/00-README.md` | Documentation hub — navigation, quick links |
+| `docs/suipatron/01-product-breakdown-and-roadmap.md` | PBS with [x]/[ ] status per task |
+| `docs/PRPs/` | PRDs, plans, templates for AI-assisted implementation |
+| `docs/architecture/PTB-SPECIFICATION.md` | PTB builders for frontend transaction construction |
 | `CLAUDE.md` | Project context for Claude Code |
 
 ---
@@ -95,9 +98,10 @@ After publishing, record:
 - [ ] `POST /api/sponsor` — accept transaction bytes, sponsor via Enoki private API
 - [ ] `POST /api/sponsor/execute` — execute previously sponsored transaction
 - [ ] `POST /api/subname` — create SuiNS subname for authenticated creator
-- [ ] `GET /api/creators` — list creator profiles (from indexer)
-- [ ] `GET /api/creator/:id` — get creator profile + content list
-- [ ] Event indexer — poll SUI events, build queryable state (in-memory or KV store)
+- [x] `GET /api/creators` — list creator profiles (from indexer) — **apps/suipatron**: `src/app/api/creators/route.ts`
+- [x] `GET /api/creator/:id` — get creator profile + content list — **apps/suipatron**: `src/app/api/creator/[id]/route.ts`
+- [x] Event indexer — poll SUI events, build queryable state — **apps/suipatron**: `src/app/lib/indexer/` (store, run, types); trigger via `GET /api/events` (cron)
+- [x] **Indexer store: Supabase** — Persistent store when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set; otherwise in-memory (dev). **apps/suipatron**: `src/app/lib/indexer/store-supabase.ts`, `get-store.ts`; schema in `supabase/migrations/20250214000000_indexer_tables.sql`. See `docs/suipatron/INDEXER-SUPABASE-ANALYSIS.md`.
 
 ### 5. Integration Hooks / Services (P3–P14)
 
@@ -306,7 +310,10 @@ npm run dev
 | Document | Purpose |
 |----------|---------|
 | `docs/SCOPE.md` | Full project specification, architecture, task breakdown, timeline |
-| `docs/SMART_CONTRACT_IMPLEMENTATION_PLAN.md` | Detailed contract implementation guide with code patterns |
+| `docs/00-README.md` | Documentation hub and navigation |
+| `docs/suipatron/01-product-breakdown-and-roadmap.md` | PBS with task status ([x]/[ ]) |
+| `docs/PRPs/README.md` | PRD → Plan → Implement workflow for features |
+| `docs/architecture/PTB-SPECIFICATION.md` | PTB builders (create_profile, purchase_access, withdraw) |
 | `CLAUDE.md` | Project context, build commands, architecture summary |
 
 ---

@@ -8,6 +8,12 @@ SuiPatron is a decentralized Patreon-like creator support platform on SUI. Creat
 
 The full specification lives in `docs/SCOPE.md`.
 
+**Documentation Hub:** Start at `docs/00-README.md` for navigation. Key paths:
+
+- `docs/reference/QUICK-START-CHECKLIST.md` — Setup and first tasks
+- `docs/PRPs/README.md` — PRD → Plan → Implement workflow for AI-assisted dev
+- `docs/suipatron/` — PBS, user stories, domain model
+
 ## Tech Stack
 
 - **Smart Contracts:** Move (SUI Move) in `move/suipatron/`
@@ -18,6 +24,7 @@ The full specification lives in `docs/SCOPE.md`.
 ## Build & Run Commands
 
 ### Move Contracts
+
 ```bash
 # Build
 cd move/suipatron && sui move build
@@ -30,6 +37,7 @@ cd move/suipatron && sui client publish --gas-budget 200000000
 ```
 
 ### Frontend
+
 ```bash
 cd frontend && npm install
 cd frontend && npm run dev     # dev server
@@ -41,10 +49,12 @@ cd frontend && npm run build   # production build
 ### Smart Contract Layer (`move/suipatron/sources/`)
 
 Two modules:
+
 - **suipatron.move** — Core: Platform (singleton shared object), CreatorProfile (shared object with flat price + dynamic Content fields), AccessPass (owned NFT), payments, withdrawal
 - **seal_policy.move** — SEAL access control: `seal_approve` validates AccessPass belongs to correct creator
 
 Key Move patterns used:
+
 - One-Time Witness (OTW) in `init` for singleton Platform + AdminCap
 - Capability pattern: AdminCap (platform admin), CreatorCap (per-creator auth)
 - Shared objects for Platform and CreatorProfile (concurrent read/write)
@@ -53,14 +63,14 @@ Key Move patterns used:
 
 ### Data Flows
 
-| Action | Path |
-|--------|------|
-| Sign in | Frontend → Google OAuth → Enoki → zkLogin address |
-| Create profile | Frontend PTB → Enoki sponsors → SUI executes → CreatorProfile + CreatorCap created |
-| Upload content | File → SEAL encrypt (client-side) → Walrus store → blobId recorded on-chain as Content dynamic field |
+| Action          | Path                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| Sign in         | Frontend → Google OAuth → Enoki → zkLogin address                                                        |
+| Create profile  | Frontend PTB → Enoki sponsors → SUI executes → CreatorProfile + CreatorCap created                       |
+| Upload content  | File → SEAL encrypt (client-side) → Walrus store → blobId recorded on-chain as Content dynamic field     |
 | Purchase access | Frontend PTB with flat payment → Enoki sponsors → SUI deposits to profile balance + mints AccessPass NFT |
-| View content | Walrus download → SEAL decrypt (seal_approve validates AccessPass) → render |
-| Withdraw | Frontend PTB → Enoki sponsors → balance transferred to creator |
+| View content    | Walrus download → SEAL decrypt (seal_approve validates AccessPass) → render                              |
+| Withdraw        | Frontend PTB → Enoki sponsors → balance transferred to creator                                           |
 
 ### SEAL Encryption Identity Format
 
@@ -68,40 +78,40 @@ Identity bytes: `[creatorProfileId (32 bytes)]`. In the flat MVP model, all cont
 
 ### Frontend Pages
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page with Google sign-in CTA |
-| `/auth/callback` | Enoki zkLogin redirect handler |
-| `/explore` | Creator discovery grid |
-| `/creator/:id` | Public creator profile + price + content |
-| `/dashboard` | Creator management (content, earnings, withdraw) |
-| `/feed` | Supporter's content feed |
+| Route            | Purpose                                          |
+| ---------------- | ------------------------------------------------ |
+| `/`              | Landing page with Google sign-in CTA             |
+| `/auth/callback` | Enoki zkLogin redirect handler                   |
+| `/explore`       | Creator discovery grid                           |
+| `/creator/:id`   | Public creator profile + price + content         |
+| `/dashboard`     | Creator management (content, earnings, withdraw) |
+| `/feed`          | Supporter's content feed                         |
 
 ### Backend API Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/sponsor` | Sponsor transaction via Enoki |
-| `POST /api/sponsor/execute` | Execute sponsored transaction |
-| `POST /api/subname` | Create SuiNS subname (`name@suipatron.sui`) |
-| `GET /api/creators` | List creator profiles (from indexer) |
-| `GET /api/creator/:id` | Get creator profile + content |
+| Endpoint                    | Purpose                                     |
+| --------------------------- | ------------------------------------------- |
+| `POST /api/sponsor`         | Sponsor transaction via Enoki               |
+| `POST /api/sponsor/execute` | Execute sponsored transaction               |
+| `POST /api/subname`         | Create SuiNS subname (`name@suipatron.sui`) |
+| `GET /api/creators`         | List creator profiles (from indexer)        |
+| `GET /api/creator/:id`      | Get creator profile + content               |
 
 ## Roadmap Features (Post-MVP)
 
 These are documented in detail in `docs/SCOPE.md` Section 13. The MVP scope remains unchanged — these are future phases.
 
-| Feature | Key Move Patterns | Phase |
-|---------|-------------------|-------|
-| Multiple Tiers | Tier struct vector, per-tier SEAL identity, tier-gated access | 2 |
-| Creator Registry | DF + String→ID Mapping | 2 |
-| One-Time Tips & Platform Fees | PTB coin splitting, platform treasury | 2 |
-| Subscription Tiers | Clock + Table (DF), time-based expiry | 2 |
-| Pay-per-Post | Modified Escrow, per-blob DF access | 3 |
-| Individual Requests | Hot Potato (`RequestReceipt`), Escrow + timeout | 3 |
-| Enhanced Content Encryption | Sui Seal + nonce-based ephemeral keys | 3 |
-| Community NFTs | OTW + Display<T>, tier-gated minting | 4 |
-| Crowdfunding | Shared Object + CampaignCap + Contributor Table (DF) | 4 |
+| Feature                       | Key Move Patterns                                             | Phase |
+| ----------------------------- | ------------------------------------------------------------- | ----- |
+| Multiple Tiers                | Tier struct vector, per-tier SEAL identity, tier-gated access | 2     |
+| Creator Registry              | DF + String→ID Mapping                                        | 2     |
+| One-Time Tips & Platform Fees | PTB coin splitting, platform treasury                         | 2     |
+| Subscription Tiers            | Clock + Table (DF), time-based expiry                         | 2     |
+| Pay-per-Post                  | Modified Escrow, per-blob DF access                           | 3     |
+| Individual Requests           | Hot Potato (`RequestReceipt`), Escrow + timeout               | 3     |
+| Enhanced Content Encryption   | Sui Seal + nonce-based ephemeral keys                         | 3     |
+| Community NFTs                | OTW + Display<T>, tier-gated minting                          | 4     |
+| Crowdfunding                  | Shared Object + CampaignCap + Contributor Table (DF)          | 4     |
 
 ## Environment Variables
 
@@ -116,6 +126,10 @@ VITE_GOOGLE_CLIENT_ID=...
 VITE_SEAL_KEY_SERVER_OBJECT_IDS=0x...,0x...
 VITE_WALRUS_NETWORK=testnet
 ENOKI_SECRET_KEY=...           # .env.local only
+
+# Indexer store (Supabase = persistent; omit for in-memory dev)
+NEXT_PUBLIC_SUPABASE_URL=...   # or SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=...  # server-only; use for indexer writes
 ```
 
 ## Implementation Status & Developer Handover
@@ -124,14 +138,19 @@ The central tracking document for what has been implemented and what remains is:
 **`docs/IMPLEMENTATION_STATUS.md`**
 
 This is the single source of truth for developer handover. When completing any task (smart contract, frontend, backend, integration):
+
 1. Update the relevant section in `docs/IMPLEMENTATION_STATUS.md`
 2. Move completed items from "Remaining" to "Completed"
 3. Add any technical notes or gotchas discovered during implementation
 4. Keep the "Contract API Quick Reference" section up to date if entry functions change
 
 Other key documents:
+
 - `docs/SCOPE.md` — Full project specification, architecture, task breakdown
-- `docs/SMART_CONTRACT_IMPLEMENTATION_PLAN.md` — Detailed contract implementation guide
+- `docs/00-README.md` — Documentation hub and navigation
+- `docs/architecture/PTB-SPECIFICATION.md` — PTB builders for create_profile, purchase_access, withdraw
+- `docs/PRPs/README.md` — PRD → Plan → Implement workflow
+- `docs/suipatron/01-product-breakdown-and-roadmap.md` — PBS with task status
 
 ## Deployment
 
