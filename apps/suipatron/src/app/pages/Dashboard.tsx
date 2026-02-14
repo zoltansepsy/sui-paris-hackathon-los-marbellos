@@ -74,7 +74,7 @@ export function Dashboard() {
 
   const profileId = user?.creatorProfile?.profileId;
   const creatorCapId = user?.creatorProfile?.creatorCapId;
-  const { updateProfile, isPending: isProfileTxPending } =
+  const { updateProfile, isPending: _isProfileTxPending } =
     useSuiPatronTransactions();
   const { data: onchainContentList } = useContentList(profileId);
   const { upload: uploadContent, isPending: isUploading } =
@@ -154,7 +154,7 @@ export function Dashboard() {
 
   if (!user) return null;
 
-  const handleBecomeCreator = () => {
+  const _handleBecomeCreator = () => {
     updateUser({
       isCreator: true,
       creatorProfile: {
