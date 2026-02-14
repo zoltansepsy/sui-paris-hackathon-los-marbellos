@@ -40,6 +40,7 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { ContentCard } from "../components/ContentCard";
+import { NFTLabCard } from "../components/NFTLabCard";
 import { mockContent } from "../lib/mock-data";
 import {
   DollarSign,
@@ -580,6 +581,9 @@ export function Dashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* NFT Lab */}
+          <NFTLabCard />
         </div>
       </section>
 
