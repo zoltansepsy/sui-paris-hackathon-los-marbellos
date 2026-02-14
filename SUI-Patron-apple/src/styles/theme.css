@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors - Apple Style System Blue */
+  --brand-primary: #007AFF;
+  --brand-primary-hover: #0056B3;
+  --brand-primary-subtle: #F2F2F7; /* System Gray 6 */
+  --brand-primary-muted: rgba(0, 122, 255, 0.1);
+
+  /* Semantic Colors - Apple System Colors */
+  --success: #34C759;
+  --success-subtle: rgba(52, 199, 89, 0.1);
+  --warning: #FF9500;
+  --warning-subtle: rgba(255, 149, 0, 0.1);
+  --error: #FF3B30;
+  --error-subtle: rgba(255, 59, 48, 0.1);
+  --info: #5856D6;
+
+  /* Light Theme Surfaces */
+  --bg-base: #F5F5F7; /* System Grouped Background - Light Gray */
+  --bg-raised: #FFFFFF; /* Cards / Main Content */
+  --bg-overlay: rgba(255, 255, 255, 0.85); /* Glass effects */
+  --bg-elevated: #FFFFFF; /* Dropdowns */
+  --bg-input: #FFFFFF;
+
+  /* Text Colors */
+  --text-primary: #1D1D1F; /* Apple Black */
+  --text-secondary: #86868B; /* Secondary Gray */
+  --text-tertiary: #AEAEB2;
+  --text-disabled: #D1D1D6;
+  --text-on-brand: #FFFFFF;
+
+  /* Borders */
+  --border-default: #E5E5EA; /* Light Gray Border */
+  --border-hover: #C7C7CC;
+  --border-focus: #007AFF;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Utilities based on Tokens */
+@layer utilities {
+  .bg-base { background-color: var(--bg-base); }
+  .bg-raised { background-color: var(--bg-raised); }
+  .bg-overlay { background-color: var(--bg-overlay); }
+  .bg-elevated { background-color: var(--bg-elevated); }
+  
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-tertiary { color: var(--text-tertiary); }
+  .text-brand { color: var(--brand-primary); }
+  
+  .border-default { border-color: var(--border-default); }
+  
+  .glass-panel {
+    background: var(--bg-overlay);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+}
