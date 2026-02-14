@@ -45,6 +45,12 @@ export interface IndexedAccessPurchase {
   timestamp: number;
 }
 
+export interface IndexedHandle {
+  handle: string;
+  profileId: string;
+  registeredAt: number;
+}
+
 /** Cursor-based pagination for GET /api/creators */
 export interface CreatorsPage {
   creators: IndexedCreator[];
@@ -64,6 +70,9 @@ export interface IndexerStore {
   ): Promise<{ creators: IndexedCreator[]; nextCursor: string | null }>;
   getContentByProfile(profileId: string): Promise<IndexedContent[]>;
   getSupporters(profileId: string): Promise<IndexedAccessPurchase[]>;
+  upsertHandle(entry: IndexedHandle): Promise<void>;
+  getHandle(handle: string): Promise<IndexedHandle | undefined>;
+  getHandleByProfileId(profileId: string): Promise<IndexedHandle | undefined>;
   getLastCursor(eventType: string): Promise<string | undefined>;
   setLastCursor(eventType: string, cursor: string): Promise<void>;
 }

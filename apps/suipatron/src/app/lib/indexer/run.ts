@@ -21,7 +21,13 @@ const EVENT_TYPES = [
   "EarningsWithdrawn",
   "TipReceived",
   "SubscriptionRenewed",
+  "HandleRegistered",
 ] as const;
+
+/** Map event types to their Move module. Most are in `suipatron`, registry events are in `registry`. */
+const EVENT_MODULE: Partial<Record<(typeof EVENT_TYPES)[number], string>> = {
+  HandleRegistered: "registry",
+};
 
 function getPackageId(): string {
   const id =
@@ -111,7 +117,10 @@ export async function runIndexer(): Promise<{
   const packageId = getPackageId();
   const client = new SuiClient({ url: getRpcUrl() });
   const store = getIndexerStore();
-  const fullType = (name: string) => `${packageId}::suipatron::${name}`;
+  const fullType = (name: (typeof EVENT_TYPES)[number]) => {
+    const mod = EVENT_MODULE[name] ?? "suipatron";
+    return `${packageId}::${mod}::${name}`;
+  };
   let processed = 0;
   const errors: string[] = [];
 
@@ -291,6 +300,16 @@ export async function runIndexer(): Promise<{
               timestamp: num(pick(parsed, "timestamp")),
             };
             await store.addAccessPurchase(purchase);
+            processed++;
+          } else if (eventType === "HandleRegistered") {
+            const handle = str(pick(parsed, "handle"));
+            const profileId = str(pick(parsed, "profile_id"));
+            if (!handle || !profileId) continue;
+            await store.upsertHandle({
+              handle,
+              profileId,
+              registeredAt: num(pick(parsed, "timestamp")),
+            });
             processed++;
           }
           // EarningsWithdrawn, TipReceived, SubscriptionRenewed: logged but no store update needed

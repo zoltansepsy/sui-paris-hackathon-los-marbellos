@@ -134,6 +134,40 @@ All frontend service-layer code updated from Phase 1 flat-price model to Phase 2
 - `CreatorProfile.tsx` — shows tier count and lowest price in support CTA
 - `Dashboard.tsx` — displays tiers list instead of flat price input, `handleBecomeCreator` creates default tier
 
+### Service Layer — Creator Registry
+
+Full service layer for the Creator Registry (handle→profile lookups). On branch `zoltan/phase-2`.
+
+**Type definitions:**
+- `IndexedHandle` added to `src/app/lib/indexer/types.ts` — `{ handle, profileId, registeredAt }`
+- `IndexerStore` interface extended with `upsertHandle`, `getHandle`, `getHandleByProfileId`
+
+**Indexer store implementations:**
+- In-memory store (`store.ts`): dual `Map` storage — `handlesByName` (handle→entry) and `handlesByProfile` (profileId→entry)
+- Supabase store (`store-supabase.ts`): `HandleRow` type, `rowToHandle` converter, `indexer_handles` table operations
+- New migration: `supabase/migrations/20250214200000_add_handles.sql` — `indexer_handles` table with `handle` PK, `profile_id` UNIQUE, `registered_at`
+
+**Indexer event processing** (`src/app/lib/indexer/run.ts`):
+- Added `HandleRegistered` to `EVENT_TYPES`
+- `EVENT_MODULE` map routes `HandleRegistered` to `registry` module (all others default to `suipatron`)
+- Handler: extracts `handle`, `profile_id`, `timestamp` → calls `store.upsertHandle()`
+
+**Service** (`src/app/lib/services/registry.ts`):
+- `lookupHandle(handle)` — returns `IndexedHandle`, throws `HandleNotFoundError`
+- `getCreatorByHandle(handle)` — resolves handle→profile→creator, throws `HandleNotFoundError` or `CreatorNotFoundError`
+- `getHandleForCreator(profileId)` — returns `IndexedHandle | null`
+
+**API route** (`src/app/api/registry/[handle]/route.ts`):
+- `GET /api/registry/:handle` — resolves handle to `{ handle, creator, content }`
+- Validates handle format via zod schema (3–30 chars, lowercase alphanumeric + hyphens/underscores)
+- 400 for invalid format, 404 for unknown handles
+
+**Error handling:**
+- `HandleNotFoundError` added to `src/shared/errors/custom-errors.ts`
+
+**Validation:**
+- `handleSchema` + `parseHandle()` in `src/shared/validation/registry.schema.ts`
+
 ### Documentation
 
 | File | Description |
@@ -189,6 +223,7 @@ After publishing, record:
 - [x] `GET /api/creator/:id` — get creator profile + content list — **apps/suipatron**: `src/app/api/creator/[id]/route.ts`
 - [x] Event indexer — poll SUI events, build queryable state — **apps/suipatron**: `src/app/lib/indexer/` (store, run, types); trigger via `GET /api/events` (cron)
 - [x] **Indexer store: Supabase** — Persistent store when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set; otherwise in-memory (dev). **apps/suipatron**: `src/app/lib/indexer/store-supabase.ts`, `get-store.ts`; schema in `supabase/migrations/20250214000000_indexer_tables.sql`. See `docs/suipatron/INDEXER-SUPABASE-ANALYSIS.md`.
+- [x] `GET /api/registry/:handle` — resolve creator handle to profile + content — **apps/suipatron**: `src/app/api/registry/[handle]/route.ts`
 
 ### 5. Integration Hooks / Services (P3–P14)
 
@@ -525,4 +560,4 @@ cd apps/suipatron && pnpm dev
 
 ---
 
-*Last updated: Phase 2 service layer tier support completed on branch `zoltan/phase-2`. Types, PTB builders (9), indexer, stores, access-pass hook, mock data, and all components updated for multi-tier model. Smart contracts (45/45 tests) on `zoltan/smart-contract-phase2`. Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*
+*Last updated: Creator Registry service layer added on branch `zoltan/phase-2`. IndexedHandle type, both stores (in-memory + Supabase), indexer HandleRegistered event processing, registry service (lookupHandle, getCreatorByHandle, getHandleForCreator), GET /api/registry/:handle route, handle validation schema, Supabase migration. Previous: Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*

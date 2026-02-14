@@ -8,12 +8,15 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedHandle,
 } from "./types";
 
 const creators = new Map<string, IndexedCreator>();
 const contentByProfile = new Map<string, IndexedContent[]>();
 const contentById = new Map<string, IndexedContent>();
 const purchasesByProfile = new Map<string, IndexedAccessPurchase[]>();
+const handlesByName = new Map<string, IndexedHandle>();
+const handlesByProfile = new Map<string, IndexedHandle>();
 
 /** Ordered list of profile IDs for stable pagination (insertion order) */
 const creatorOrder: string[] = [];
@@ -96,6 +99,19 @@ const syncStore = {
     return ensurePurchaseList(profileId).slice();
   },
 
+  upsertHandle(entry: IndexedHandle): void {
+    handlesByName.set(entry.handle, entry);
+    handlesByProfile.set(entry.profileId, entry);
+  },
+
+  getHandle(handle: string): IndexedHandle | undefined {
+    return handlesByName.get(handle);
+  },
+
+  getHandleByProfileId(profileId: string): IndexedHandle | undefined {
+    return handlesByProfile.get(profileId);
+  },
+
   getLastCursor(eventType: string): string | undefined {
     return (
       globalThis as unknown as { __indexerCursors?: Record<string, string> }
@@ -122,6 +138,10 @@ export const indexerStore: IndexerStore = {
   getContentByProfile: (id) =>
     Promise.resolve(syncStore.getContentByProfile(id)),
   getSupporters: (id) => Promise.resolve(syncStore.getSupporters(id)),
+  upsertHandle: (e) => Promise.resolve(syncStore.upsertHandle(e)),
+  getHandle: (h) => Promise.resolve(syncStore.getHandle(h)),
+  getHandleByProfileId: (id) =>
+    Promise.resolve(syncStore.getHandleByProfileId(id)),
   getLastCursor: (t) => Promise.resolve(syncStore.getLastCursor(t)),
   setLastCursor: (t, c) => Promise.resolve(syncStore.setLastCursor(t, c)),
 };

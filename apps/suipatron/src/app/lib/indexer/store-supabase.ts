@@ -9,6 +9,7 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedHandle,
   IndexedTier,
 } from "./types";
 
@@ -44,6 +45,12 @@ type PurchaseRow = {
   tier_level: number;
   expires_at: number | null;
   timestamp: number;
+};
+
+type HandleRow = {
+  handle: string;
+  profile_id: string;
+  registered_at: number;
 };
 
 function parseTiersJson(raw: unknown): IndexedTier[] {
@@ -123,6 +130,14 @@ function rowToPurchase(r: PurchaseRow): IndexedAccessPurchase {
     tierLevel: Number(r.tier_level ?? 1),
     expiresAt: r.expires_at != null ? Number(r.expires_at) : null,
     timestamp: Number(r.timestamp),
+  };
+}
+
+function rowToHandle(r: HandleRow): IndexedHandle {
+  return {
+    handle: r.handle,
+    profileId: r.profile_id,
+    registeredAt: Number(r.registered_at),
   };
 }
 
@@ -256,6 +271,42 @@ export function createSupabaseStore(): IndexerStore {
         .eq("creator_profile_id", profileId)
         .order("timestamp", { ascending: false });
       return (data ?? []).map((r: PurchaseRow) => rowToPurchase(r));
+    },
+
+    async upsertHandle(entry: IndexedHandle) {
+      const supabase = getClient();
+      await supabase.from("indexer_handles").upsert(
+        {
+          handle: entry.handle,
+          profile_id: entry.profileId,
+          registered_at: entry.registeredAt,
+        },
+        { onConflict: "handle" },
+      );
+    },
+
+    async getHandle(handle: string): Promise<IndexedHandle | undefined> {
+      const supabase = getClient();
+      const { data, error } = await supabase
+        .from("indexer_handles")
+        .select("*")
+        .eq("handle", handle)
+        .single();
+      if (error || !data) return undefined;
+      return rowToHandle(data as HandleRow);
+    },
+
+    async getHandleByProfileId(
+      profileId: string,
+    ): Promise<IndexedHandle | undefined> {
+      const supabase = getClient();
+      const { data, error } = await supabase
+        .from("indexer_handles")
+        .select("*")
+        .eq("profile_id", profileId)
+        .single();
+      if (error || !data) return undefined;
+      return rowToHandle(data as HandleRow);
     },
 
     async getLastCursor(eventType: string): Promise<string | undefined> {
