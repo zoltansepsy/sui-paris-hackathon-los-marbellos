@@ -3,6 +3,8 @@
 > **Central developer handover document.** Update this file as tasks are completed.
 > Cross-references task IDs from `docs/SCOPE.md` Section 8.
 
+**Production readiness:** Enoki is **required** — when `NEXT_PUBLIC_ENOKI_PUBLIC_KEY` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are not set, the app shows an "Enoki not configured" screen (no mock auth or mock support). Creator profile and content use **on-chain data only** (no mock creator/content fallbacks).
+
 ---
 
 ## Completed
