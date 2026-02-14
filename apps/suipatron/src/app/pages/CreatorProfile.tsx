@@ -16,15 +16,30 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
+import { EncryptedContentViewer } from "../components/EncryptedContentViewer";
 import { mockCreators, mockContent } from "../lib/mock-data";
-import { Users, Lock, CheckCircle2, Settings, ExternalLink } from "lucide-react";
-import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
+import {
+  Users,
+  Lock,
+  CheckCircle2,
+  Settings,
+  ExternalLink,
+} from "lucide-react";
+import { WALRUS_AGGREGATOR_URL_TESTNET, type ContentType } from "../constants";
 
 export function CreatorProfile() {
   const params = useParams();
   const id = params.id as string;
   const { user, walletAddress } = useAuth();
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [viewerContent, setViewerContent] = useState<{
+    blobId: string;
+    creatorProfileId: string;
+    accessPassId: string;
+    contentType: ContentType;
+    title: string;
+    description?: string;
+  } | null>(null);
 
   // On-chain queries
   const { data: profile, isLoading: profileLoading } = useCreatorProfile(id);
@@ -183,42 +198,46 @@ export function CreatorProfile() {
           {creatorContent.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {creatorContent.map((content) => {
-                const blobId = (content as any).blobId;
+                const blobId =
+                  "blobId" in content
+                    ? (content as { blobId: string }).blobId
+                    : undefined;
                 const blobUrl = blobId
                   ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
                   : null;
-
-                // Debug: log to see if blobId exists
-                console.log("Content:", content.title, "BlobId:", blobId, "Has URL:", !!blobUrl);
 
                 return (
                   <div key={content.id} className="space-y-2">
                     <ContentCard
                       content={content}
                       isLocked={!userHasAccess && !isOwnProfile}
-                      blobId={blobId}
+                      blobId={
+                        userHasAccess || isOwnProfile ? blobId : undefined
+                      }
                       onClick={
                         !userHasAccess && !isOwnProfile
                           ? () => setShowSupportModal(true)
                           : undefined
                       }
                     />
-                    {blobUrl && (
-                      <a
-                        href={blobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
+                    {userHasAccess && accessPass && blobId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() =>
+                          setViewerContent({
+                            blobId,
+                            creatorProfileId: creator.id,
+                            accessPassId: accessPass.objectId,
+                            contentType: content.type as ContentType,
+                            title: content.title,
+                            description: content.description,
+                          })
+                        }
                       >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-xs"
-                        >
-                          <ExternalLink className="h-3 w-3 mr-2" />
-                          View Encrypted Blob (SEAL Demo)
-                        </Button>
-                      </a>
+                        View (decrypt)
+                      </Button>
                     )}
                   </div>
                 );
@@ -242,6 +261,19 @@ export function CreatorProfile() {
           open={showSupportModal}
           onOpenChange={setShowSupportModal}
           onSuccess={() => {}}
+        />
+      )}
+
+      {viewerContent && (
+        <EncryptedContentViewer
+          open={!!viewerContent}
+          onOpenChange={(open) => !open && setViewerContent(null)}
+          blobId={viewerContent.blobId}
+          creatorProfileId={viewerContent.creatorProfileId}
+          accessPassId={viewerContent.accessPassId}
+          contentType={viewerContent.contentType}
+          title={viewerContent.title}
+          description={viewerContent.description}
         />
       )}
     </div>

@@ -39,20 +39,20 @@ SuiPatron MVP is a functional decentralized Patreon-like platform: creators crea
 
 | ID | Task | Status | Phase |
 |----|------|--------|-------|
-| P1 | Enoki zkLogin: Google sign-in flow | [ ] | 1 |
-| P2 | Auth callback handling + redirect | [ ] | 1 |
-| P3 | Transaction builder: create_profile PTB | [ ] | 2 |
-| P4 | Transaction builder: purchase_access PTB | [ ] | 2 |
-| P5 | Enoki sponsored transaction execution | [ ] | 2 |
-| P6 | SEAL encryption pipeline | [ ] | 2 |
-| P7 | Walrus upload pipeline | [ ] | 2 |
-| P8 | Content upload flow (encrypt → upload → publish tx) | [ ] | 2 |
-| P9 | Walrus download pipeline | [ ] | 3 |
-| P10 | SEAL decryption pipeline | [ ] | 3 |
-| P11 | Content access flow (download → decrypt → render) | [ ] | 3 |
+| P1 | Enoki zkLogin: Google sign-in flow | [x] | 1 |
+| P2 | Auth callback handling + redirect | [x] | 1 |
+| P3 | Transaction builder: create_profile PTB | [x] | 2 |
+| P4 | Transaction builder: purchase_access PTB | [x] | 2 |
+| P5 | Enoki sponsored transaction execution | [x] | 2 |
+| P6 | SEAL encryption pipeline | [x] | 2 |
+| P7 | Walrus upload pipeline | [x] | 2 |
+| P8 | Content upload flow (encrypt → upload → publish tx) | [x] | 2 |
+| P9 | Walrus download pipeline | [x] | 3 |
+| P10 | SEAL decryption pipeline | [x] | 3 |
+| P11 | Content access flow (download → decrypt → render) | [x] | 3 |
 | P12 | SuiNS subname creation | [ ] | 3 |
-| P13 | Transaction builder: withdraw_earnings PTB | [ ] | 3 |
-| P14 | User's AccessPass fetching + caching | [ ] | 2 |
+| P13 | Transaction builder: withdraw_earnings PTB | [x] | 3 |
+| P14 | User's AccessPass fetching + caching | [x] | 2 |
 
 ---
 
@@ -60,18 +60,18 @@ SuiPatron MVP is a functional decentralized Patreon-like platform: creators crea
 
 | ID | Task | Status | Phase |
 |----|------|--------|-------|
-| J1 | Design system: Button, Card, Modal, Badge, Toast | [ ] | 1 |
-| J2 | Layout: Header, navigation, responsive shell | [ ] | 1 |
-| J3 | Landing page: hero, features, CTA | [ ] | 1 |
-| J4 | Explore page: creator grid | [ ] | 1 |
-| J5 | Creator Profile page: header, price, content grid | [ ] | 2 |
-| J6 | Support modal: payment confirmation UI | [ ] | 2 |
-| J7 | Creator Dashboard: profile editor, price setting | [ ] | 2 |
-| J8 | Content uploader: file picker, metadata form | [ ] | 2 |
-| J9 | Content viewer: image, text, PDF renderers | [ ] | 3 |
-| J10 | Supporter feed: subscriptions list, content feed | [ ] | 3 |
-| J11 | Loading states, skeleton screens | [ ] | 3 |
-| J12 | Error toasts, empty states | [ ] | 3 |
+| J1 | Design system: Button, Card, Modal, Badge, Toast | [x] | 1 |
+| J2 | Layout: Header, navigation, responsive shell | [x] | 1 |
+| J3 | Landing page: hero, features, CTA | [x] | 1 |
+| J4 | Explore page: creator grid | [x] | 1 |
+| J5 | Creator Profile page: header, price, content grid | [x] | 2 |
+| J6 | Support modal: payment confirmation UI | [x] | 2 |
+| J7 | Creator Dashboard: profile editor, price setting | [x] | 2 |
+| J8 | Content uploader: file picker, metadata form | [x] | 2 |
+| J9 | Content viewer: image, text, PDF renderers | [x] | 3 |
+| J10 | Supporter feed: subscriptions list, content feed | [x] | 3 |
+| J11 | Loading states, skeleton screens | [x] | 3 |
+| J12 | Error toasts, empty states | [x] | 3 |
 | J13 | Demo data seeding + demo polish | [ ] | 4 |
 
 ---
@@ -80,9 +80,9 @@ SuiPatron MVP is a functional decentralized Patreon-like platform: creators crea
 
 | ID | Task | Status | Phase |
 |----|------|--------|-------|
-| Z1 | Scaffold monorepo: frontend, move package | [ ] | 1 |
-| Z2 | Configure Vercel deployment | [ ] | 1 |
-| Z3 | Environment configuration | [ ] | 1 |
+| Z1 | Scaffold monorepo: frontend, move package | [x] | 1 |
+| Z2 | Configure Vercel deployment | [x] | 1 |
+| Z3 | Environment configuration | [x] | 1 |
 | Z4 | Enoki Portal setup | [ ] | 1 |
 | Z5 | SuiNS domain registration (testnet) | [ ] | 1 |
 | Z6 | Integration testing: sign in → create profile → upload | [ ] | 3 |

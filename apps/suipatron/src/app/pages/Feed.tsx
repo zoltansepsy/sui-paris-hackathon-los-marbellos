@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useMyAccessPasses } from "../hooks/useAccessPass";
@@ -8,6 +8,7 @@ import {
   useCreatorProfilesByIds,
   useCreatorProfiles,
   useContentList,
+  useFeedContent,
 } from "../hooks/useCreator";
 import {
   creatorProfileToCreator,
@@ -62,10 +63,33 @@ export function Feed() {
   const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } =
     useContentList(mostSupportedCreator?.objectId);
 
+  const { data: contentByCreator, isLoading: feedContentLoading } =
+    useFeedContent(
+      supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
+    );
+
   // Convert on-chain profiles to UI Creator type
   const supportedCreators: Creator[] = onchainCreatorProfiles
     ? onchainCreatorProfiles.map(creatorProfileToCreator)
     : [];
+
+  const feedContent = useMemo((): (Content & {
+    creator: Creator;
+    blobId: string;
+  })[] => {
+    if (!contentByCreator?.length || !supportedCreators.length) return [];
+    const creatorsMap = new Map(supportedCreators.map((c) => [c.id, c]));
+    const flat: (Content & { creator: Creator; blobId: string })[] = [];
+    for (const { profileId, contents } of contentByCreator) {
+      const creator = creatorsMap.get(profileId);
+      if (!creator) continue;
+      for (const c of contents) {
+        const item = onchainContentToContent(c, profileId, false);
+        flat.push({ ...item, creator });
+      }
+    }
+    return flat.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [contentByCreator, supportedCreators]);
 
   if (!user) {
     return (
@@ -88,10 +112,7 @@ export function Feed() {
     );
   }
 
-  // For now, use supportedCreatorIds to show creator links
-  const feedContent: (Content & { creator: Creator })[] = [];
-
-  if (passesLoading || creatorsLoading) {
+  if (passesLoading || creatorsLoading || feedContentLoading) {
     return <LoadingState />;
   }
 
@@ -257,7 +278,11 @@ export function Feed() {
                         </span>
                       </div>
                     </Link>
-                    <ContentCard content={item} isLocked={false} />
+                    <ContentCard
+                      content={item}
+                      isLocked={false}
+                      blobId={item.blobId}
+                    />
                   </div>
                 ))}
               </div>

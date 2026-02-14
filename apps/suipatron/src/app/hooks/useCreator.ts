@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useNetworkVariable } from "@hack/blockchain/sdk/networkConfig";
 import { createCreatorService } from "../services/creatorService";
+import type { Content } from "../types/onchain";
 
 /**
  * Hook to get a single CreatorProfile by ID.
@@ -125,4 +126,43 @@ export function useCreatorProfilesByIds(profileIds: string[] | undefined) {
     enabled: !!profileIds && profileIds.length > 0,
     staleTime: 30_000,
   });
+}
+
+export interface FeedContentByCreator {
+  profileId: string;
+  contents: Content[];
+}
+
+/**
+ * Fetch content for multiple creator profiles in parallel.
+ * Returns an array of { profileId, contents } for building a merged feed.
+ */
+export function useFeedContent(profileIds: string[] | undefined) {
+  const suiClient = useSuiClient();
+  const packageId = useNetworkVariable("packageId");
+
+  const service = useMemo(
+    () => createCreatorService(suiClient, packageId),
+    [suiClient, packageId],
+  );
+
+  const queries = useQueries({
+    queries: (profileIds ?? []).map((profileId) => ({
+      queryKey: ["contentList", profileId] as const,
+      queryFn: () => service.getContentList(profileId),
+      enabled: !!profileId,
+      staleTime: 30_000,
+    })),
+  });
+
+  const data = useMemo((): FeedContentByCreator[] => {
+    return (profileIds ?? []).map((profileId, i) => ({
+      profileId,
+      contents: queries[i]?.data ?? [],
+    }));
+  }, [profileIds, queries]);
+
+  const isLoading = queries.some((q) => q.isLoading);
+
+  return { data, isLoading };
 }
