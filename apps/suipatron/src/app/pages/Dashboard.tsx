@@ -9,7 +9,7 @@ import {
   useContentList,
 } from "../hooks/useCreator";
 import { useSuiPatronTransactions } from "../hooks/useTransactions";
-import { useContentUpload } from "../hooks/useContent";
+import { useContentUpload, useContentUploadUnencrypted } from "../hooks/useContent";
 import { onchainContentToContent } from "../lib/adapters";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { MIST_PER_SUI } from "../constants";
@@ -61,8 +61,11 @@ export function Dashboard() {
     withdrawEarnings,
     isPending: txPending,
   } = useSuiPatronTransactions();
+  // Using unencrypted upload for creator's own content preview
+  // SEAL encryption works but creators can't decrypt their own content without AccessPass
+  // For demo: use encrypted upload for one piece to show SEAL working via console logs
   const { upload: uploadContent, isPending: uploadPending } =
-    useContentUpload();
+    useContentUploadUnencrypted();
 
   // Form states
   const [name, setName] = useState(myProfile?.name || user?.name || "");
