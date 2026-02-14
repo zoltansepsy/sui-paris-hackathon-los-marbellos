@@ -19,7 +19,12 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
   const sponsorTx = useSponsorTransaction();
   const [name, setName] = useState(user?.name || "");
   const [bio, setBio] = useState("");
-  const [price, setPrice] = useState("5");
+  const [tierName, setTierName] = useState("Supporter");
+  const [tierDescription, setTierDescription] = useState(
+    "Access to all content",
+  );
+  const [tierPrice, setTierPrice] = useState("5");
+  const [tierLevel, setTierLevel] = useState("1");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,14 +32,31 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
 
     try {
       const priceMist = BigInt(
-        Math.round(parseFloat(price || "0") * Number(SUI_TO_MIST)),
+        Math.round(parseFloat(tierPrice || "0") * Number(SUI_TO_MIST)),
       );
+      const level = parseInt(tierLevel) || 1;
       const { digest } = await sponsorTx.execute({
-        buildTx: () => buildCreateProfileTx(name, bio, priceMist),
+        buildTx: () =>
+          buildCreateProfileTx(
+            name,
+            bio,
+            tierName,
+            tierDescription,
+            priceMist,
+            level,
+            null, // permanent (no duration)
+          ),
         getSender: async () => user.id,
       });
 
       const created = await getCreatedProfileFromTx(digest);
+      const tier = {
+        name: tierName,
+        description: tierDescription,
+        price: parseFloat(tierPrice) || 5,
+        tierLevel: level,
+        durationMs: null,
+      };
       if (created) {
         updateUser({
           isCreator: true,
@@ -43,7 +65,7 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
             profileId: created.profileId,
             creatorCapId: created.creatorCapId,
             bio,
-            price: parseFloat(price) || 5,
+            tiers: [tier],
             balance: 0,
             contentCount: 0,
             supporterCount: 0,
@@ -55,7 +77,7 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
           name,
           creatorProfile: {
             bio,
-            price: parseFloat(price) || 5,
+            tiers: [tier],
             balance: 0,
             contentCount: 0,
             supporterCount: 0,
@@ -92,21 +114,48 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
           placeholder="Tell supporters about your work..."
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="create-price">Support Price (SUI)</Label>
-        <Input
-          id="create-price"
-          type="number"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          min="0"
-          step="0.1"
-          required
-        />
+
+      <div className="border rounded-lg p-4 space-y-4">
+        <h3 className="font-semibold text-sm">Initial Tier</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="create-tier-name">Tier Name</Label>
+            <Input
+              id="create-tier-name"
+              value={tierName}
+              onChange={(e) => setTierName(e.target.value)}
+              required
+              placeholder="e.g. Supporter"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="create-tier-price">Price (SUI)</Label>
+            <Input
+              id="create-tier-price"
+              type="number"
+              value={tierPrice}
+              onChange={(e) => setTierPrice(e.target.value)}
+              min="0"
+              step="0.1"
+              required
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="create-tier-desc">Tier Description</Label>
+          <Input
+            id="create-tier-desc"
+            value={tierDescription}
+            onChange={(e) => setTierDescription(e.target.value)}
+            placeholder="What supporters get at this tier"
+          />
+        </div>
+        <input type="hidden" value={tierLevel} />
         <p className="text-xs text-muted-foreground">
-          One-time payment for permanent access to all your content
+          You can add more tiers after creating your profile
         </p>
       </div>
+
       <Button
         type="submit"
         size="lg"

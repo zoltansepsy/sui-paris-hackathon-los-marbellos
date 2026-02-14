@@ -10,7 +10,22 @@ export const mockCreators: Creator[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
     suinsName: "alice@suipatron.sui",
     bio: "Digital artist creating abstract and surreal artwork. Support to unlock my exclusive collection.",
-    price: 5,
+    tiers: [
+      {
+        name: "Supporter",
+        description: "Access to public artwork",
+        price: 3,
+        tierLevel: 1,
+        durationMs: null,
+      },
+      {
+        name: "Patron",
+        description: "Full access to all exclusive art",
+        price: 8,
+        tierLevel: 2,
+        durationMs: null,
+      },
+    ],
     balance: 125,
     contentCount: 12,
     supporterCount: 25,
@@ -22,7 +37,22 @@ export const mockCreators: Creator[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
     suinsName: "bob@suipatron.sui",
     bio: "Photographer exploring urban landscapes and street photography. One-time support unlocks all my work.",
-    price: 8,
+    tiers: [
+      {
+        name: "Fan",
+        description: "Basic photo access",
+        price: 5,
+        tierLevel: 1,
+        durationMs: null,
+      },
+      {
+        name: "Collector",
+        description: "Full resolution + behind-the-scenes",
+        price: 12,
+        tierLevel: 2,
+        durationMs: null,
+      },
+    ],
     balance: 240,
     contentCount: 24,
     supporterCount: 30,
@@ -34,7 +64,15 @@ export const mockCreators: Creator[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
     suinsName: "carol@suipatron.sui",
     bio: "Writer and poet sharing exclusive stories and poems. Get permanent access to all my work.",
-    price: 3,
+    tiers: [
+      {
+        name: "Reader",
+        description: "Access to all stories and poems",
+        price: 3,
+        tierLevel: 1,
+        durationMs: null,
+      },
+    ],
     balance: 87,
     contentCount: 18,
     supporterCount: 29,
@@ -46,7 +84,29 @@ export const mockCreators: Creator[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
     suinsName: "david@suipatron.sui",
     bio: "Music producer creating electronic and ambient tracks. Support once, own forever.",
-    price: 10,
+    tiers: [
+      {
+        name: "Listener",
+        description: "Access to released tracks",
+        price: 5,
+        tierLevel: 1,
+        durationMs: null,
+      },
+      {
+        name: "Producer Club",
+        description: "Stems, samples, and WIPs",
+        price: 15,
+        tierLevel: 2,
+        durationMs: null,
+      },
+      {
+        name: "VIP",
+        description: "Everything + 1-on-1 feedback",
+        price: 30,
+        tierLevel: 3,
+        durationMs: null,
+      },
+    ],
     balance: 320,
     contentCount: 15,
     supporterCount: 32,
@@ -57,7 +117,15 @@ export const mockCreators: Creator[] = [
     email: "emma@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma",
     bio: "Illustrator and character designer. No monthly fees, just one-time support.",
-    price: 6,
+    tiers: [
+      {
+        name: "Supporter",
+        description: "Access to illustrations",
+        price: 6,
+        tierLevel: 1,
+        durationMs: null,
+      },
+    ],
     contentCount: 20,
     supporterCount: 18,
   },
@@ -68,7 +136,22 @@ export const mockCreators: Creator[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=frank",
     suinsName: "frank@suipatron.sui",
     bio: "Tutorial creator for digital art techniques. Lifetime access to all tutorials.",
-    price: 12,
+    tiers: [
+      {
+        name: "Student",
+        description: "Basic tutorials",
+        price: 5,
+        tierLevel: 1,
+        durationMs: null,
+      },
+      {
+        name: "Pro",
+        description: "Advanced tutorials + source files",
+        price: 15,
+        tierLevel: 2,
+        durationMs: null,
+      },
+    ],
     contentCount: 30,
     supporterCount: 45,
   },
@@ -85,6 +168,7 @@ export const mockContent: Content[] = [
     thumbnail:
       "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-02-01"),
   },
   {
@@ -96,6 +180,7 @@ export const mockContent: Content[] = [
     thumbnail:
       "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=400",
     isLocked: true,
+    minTierLevel: 2,
     createdAt: new Date("2025-02-03"),
   },
   {
@@ -105,6 +190,7 @@ export const mockContent: Content[] = [
     description: "Behind the scenes of my creative process",
     type: "text",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-02-05"),
   },
   {
@@ -114,6 +200,7 @@ export const mockContent: Content[] = [
     description: "My approach to color in digital art",
     type: "pdf",
     isLocked: true,
+    minTierLevel: 2,
     createdAt: new Date("2025-02-07"),
   },
 
@@ -127,6 +214,7 @@ export const mockContent: Content[] = [
     thumbnail:
       "https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=400",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-01-28"),
   },
   {
@@ -138,6 +226,7 @@ export const mockContent: Content[] = [
     thumbnail:
       "https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=400",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-02-02"),
   },
   {
@@ -147,6 +236,7 @@ export const mockContent: Content[] = [
     description: "Street photography techniques",
     type: "text",
     isLocked: true,
+    minTierLevel: 2,
     createdAt: new Date("2025-02-06"),
   },
 
@@ -158,6 +248,7 @@ export const mockContent: Content[] = [
     description: "A collection of short poems",
     type: "text",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-01-30"),
   },
   {
@@ -167,6 +258,7 @@ export const mockContent: Content[] = [
     description: "Short story about connection",
     type: "text",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-02-04"),
   },
   {
@@ -176,6 +268,7 @@ export const mockContent: Content[] = [
     description: "How I approach creative writing",
     type: "pdf",
     isLocked: true,
+    minTierLevel: 1,
     createdAt: new Date("2025-02-08"),
   },
 ];

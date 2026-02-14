@@ -43,9 +43,7 @@ export function Dashboard() {
   // Form states
   const [name, setName] = useState(user?.name || "");
   const [bio, setBio] = useState(user?.creatorProfile?.bio || "");
-  const [price, setPrice] = useState(
-    user?.creatorProfile?.price?.toString() || "5",
-  );
+  const tiers = user?.creatorProfile?.tiers ?? [];
   const [suinsInput, setSuinsInput] = useState("");
 
   useEffect(() => {
@@ -61,7 +59,15 @@ export function Dashboard() {
       isCreator: true,
       creatorProfile: {
         bio: "",
-        price: 5,
+        tiers: [
+          {
+            name: "Supporter",
+            description: "Access to all content",
+            price: 5,
+            tierLevel: 1,
+            durationMs: null,
+          },
+        ],
         balance: 0,
         contentCount: 0,
         supporterCount: 0,
@@ -80,7 +86,6 @@ export function Dashboard() {
       creatorProfile: {
         ...user.creatorProfile,
         bio,
-        price: parseFloat(price) || 5,
       },
     });
 
@@ -301,21 +306,39 @@ export function Dashboard() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="price">Support Price (SUI)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    disabled={!isEditing}
-                    min="0"
-                    step="0.1"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    One-time payment for permanent access to all your content
-                  </p>
-                </div>
+                {tiers.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Tiers</Label>
+                    <div className="space-y-2">
+                      {tiers.map((tier, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">{tier.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {tier.description}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-sm">
+                              {tier.price} SUI
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {tier.durationMs
+                                ? `${Math.round(tier.durationMs / 86400000)}d`
+                                : "Permanent"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Manage tiers from your creator dashboard
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

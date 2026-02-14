@@ -1,7 +1,6 @@
 /**
- * SuiPatron event indexer: polls SUI chain for ProfileCreated, ProfileUpdated,
- * ContentPublished, AccessPurchased, EarningsWithdrawn and upserts into the store.
- * Uses getObject to fill bio/title/description not present in events.
+ * SuiPatron event indexer (Phase 2): polls SUI chain for all events
+ * and upserts into the store. Uses getObject to fill fields not in events.
  */
 
 import { SuiClient } from "@mysten/sui/client";
@@ -10,14 +9,18 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedTier,
 } from "./types";
 
 const EVENT_TYPES = [
   "ProfileCreated",
   "ProfileUpdated",
+  "TierAdded",
   "ContentPublished",
   "AccessPurchased",
   "EarningsWithdrawn",
+  "TipReceived",
+  "SubscriptionRenewed",
 ] as const;
 
 function getPackageId(): string {
@@ -69,6 +72,36 @@ function optStr(v: unknown): string | undefined {
     return arr?.[0] != null ? str(arr[0]) : undefined;
   }
   return str(v) || undefined;
+}
+
+/** Extract optional number from Move Option<u64> (vec array) or raw value */
+function optNum(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number") return v;
+  if (Array.isArray(v)) return v[0] != null ? num(v[0]) : null;
+  if (typeof v === "object" && v !== null && "vec" in v) {
+    const arr = (v as { vec: unknown[] }).vec;
+    return arr?.[0] != null ? num(arr[0]) : null;
+  }
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Parse a Move Tier struct from on-chain object fields */
+function parseTier(raw: Record<string, unknown>): IndexedTier {
+  return {
+    name: str(raw.name),
+    description: str(raw.description),
+    price: num(raw.price),
+    tierLevel: num(raw.tier_level),
+    durationMs: optNum(raw.duration_ms),
+  };
+}
+
+/** Parse tiers vector from on-chain CreatorProfile fields */
+function parseTiers(raw: unknown): IndexedTier[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((t: Record<string, unknown>) => parseTier(t));
 }
 
 export async function runIndexer(): Promise<{
@@ -130,7 +163,7 @@ export async function runIndexer(): Promise<{
                 bio: str(f.bio ?? ""),
                 avatarBlobId: optStr(f.avatar_blob_id),
                 suinsName: optStr(f.suins_name),
-                price: num(f.price ?? pick(parsed, "price")),
+                tiers: parseTiers(f.tiers),
                 contentCount: num(f.content_count ?? 0),
                 totalSupporters: num(f.total_supporters ?? 0),
                 createdAt: num(pick(parsed, "timestamp")),
@@ -142,7 +175,7 @@ export async function runIndexer(): Promise<{
                 owner: str(pick(parsed, "owner")),
                 name: str(pick(parsed, "name")),
                 bio: "",
-                price: num(pick(parsed, "price")),
+                tiers: [],
                 contentCount: 0,
                 totalSupporters: 0,
                 createdAt: num(pick(parsed, "timestamp")),
@@ -167,7 +200,7 @@ export async function runIndexer(): Promise<{
                 bio: str(f.bio ?? ""),
                 avatarBlobId: optStr(f.avatar_blob_id),
                 suinsName: optStr(f.suins_name),
-                price: num(f.price),
+                tiers: parseTiers(f.tiers),
                 contentCount: num(
                   f.content_count ?? existing?.contentCount ?? 0,
                 ),
@@ -178,6 +211,23 @@ export async function runIndexer(): Promise<{
                   existing?.createdAt ?? num(pick(parsed, "timestamp")),
               };
               await store.upsertCreator(creator);
+            }
+            processed++;
+          } else if (eventType === "TierAdded") {
+            const profileId = str(pick(parsed, "profile_id"));
+            if (!profileId) continue;
+            const obj = await client.getObject({
+              id: profileId,
+              options: { showContent: true },
+            });
+            const content = obj.data?.content;
+            if (content && typeof content === "object" && "fields" in content) {
+              const f = (content as { fields: Record<string, unknown> }).fields;
+              const existing = await store.getCreator(profileId);
+              if (existing) {
+                existing.tiers = parseTiers(f.tiers);
+                await store.upsertCreator(existing);
+              }
             }
             processed++;
           } else if (eventType === "ContentPublished") {
@@ -196,7 +246,7 @@ export async function runIndexer(): Promise<{
             ) {
               const f = (contentObj as { fields: Record<string, unknown> })
                 .fields;
-              const content: IndexedContent = {
+              const indexedContent: IndexedContent = {
                 contentId,
                 creatorProfileId: profileId,
                 title: str(f.title),
@@ -205,9 +255,12 @@ export async function runIndexer(): Promise<{
                 contentType: str(
                   f.content_type ?? pick(parsed, "content_type"),
                 ),
+                minTierLevel: num(
+                  f.min_tier_level ?? pick(parsed, "min_tier_level") ?? 0,
+                ),
                 createdAt: num(f.created_at ?? pick(parsed, "timestamp")),
               };
-              await store.upsertContent(content);
+              await store.upsertContent(indexedContent);
               const creator = await store.getCreator(profileId);
               if (creator) {
                 const contentList = await store.getContentByProfile(profileId);
@@ -222,6 +275,7 @@ export async function runIndexer(): Promise<{
                 description: "",
                 blobId: str(pick(parsed, "blob_id")),
                 contentType: str(pick(parsed, "content_type")),
+                minTierLevel: num(pick(parsed, "min_tier_level") ?? 0),
                 createdAt: num(pick(parsed, "timestamp")),
               });
             }
@@ -232,12 +286,14 @@ export async function runIndexer(): Promise<{
               creatorProfileId: str(pick(parsed, "profile_id")),
               supporter: str(pick(parsed, "supporter")),
               amount: num(pick(parsed, "amount")),
+              tierLevel: num(pick(parsed, "tier_level") ?? 1),
+              expiresAt: optNum(pick(parsed, "expires_at")),
               timestamp: num(pick(parsed, "timestamp")),
             };
             await store.addAccessPurchase(purchase);
             processed++;
           }
-          // EarningsWithdrawn: we could refresh creator balance via getObject; skip for now to avoid extra RPC
+          // EarningsWithdrawn, TipReceived, SubscriptionRenewed: logged but no store update needed
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           errors.push(`${eventType} ${id}: ${msg}`);

@@ -1,6 +1,6 @@
 /**
- * PTB (Programmable Transaction Block) builders for SuiPatron.
- * See docs/architecture/PTB-SPECIFICATION.md
+ * PTB (Programmable Transaction Block) builders for SuiPatron Phase 2.
+ * See docs/architecture/PTB-SPECIFICATION.md and docs/IMPLEMENTATION_STATUS.md
  */
 
 import { Transaction } from "@mysten/sui/transactions";
@@ -29,13 +29,28 @@ function getPlatformId(): string {
   return id;
 }
 
+function getRegistryId(): string {
+  const id =
+    process.env.NEXT_PUBLIC_REGISTRY_ID ?? process.env.VITE_REGISTRY_ID ?? "";
+  if (!id) {
+    throw new Error(
+      "NEXT_PUBLIC_REGISTRY_ID (or VITE_REGISTRY_ID) not configured",
+    );
+  }
+  return id;
+}
+
 /**
- * Build create_profile transaction.
+ * Build create_profile transaction with initial tier.
  */
 export function buildCreateProfileTx(
   name: string,
   bio: string,
-  priceMist: bigint,
+  tierName: string,
+  tierDescription: string,
+  tierPriceMist: bigint,
+  tierLevel: number,
+  tierDurationMs: bigint | null,
 ): Transaction {
   const tx = new Transaction();
   const pkg = getPackageId();
@@ -47,7 +62,11 @@ export function buildCreateProfileTx(
       tx.object(platform),
       tx.pure.string(name),
       tx.pure.string(bio),
-      tx.pure.u64(priceMist),
+      tx.pure.string(tierName),
+      tx.pure.string(tierDescription),
+      tx.pure.u64(tierPriceMist),
+      tx.pure.u64(tierLevel),
+      tx.pure.option("u64", tierDurationMs),
       tx.object(CLOCK_OBJECT_ID),
     ],
   });
@@ -57,10 +76,11 @@ export function buildCreateProfileTx(
 
 /**
  * Build purchase_access transaction.
- * Splits payment from gas coin and calls purchase_access.
+ * Splits payment from gas coin and calls purchase_access with tier_index.
  */
 export function buildPurchaseAccessTx(
   profileId: string,
+  tierIndex: number,
   priceMist: bigint,
 ): Transaction {
   const tx = new Transaction();
@@ -74,6 +94,7 @@ export function buildPurchaseAccessTx(
     arguments: [
       tx.object(platform),
       tx.object(profileId),
+      tx.pure.u64(tierIndex),
       payment,
       tx.object(CLOCK_OBJECT_ID),
     ],
@@ -106,6 +127,7 @@ export function buildWithdrawEarningsTx(
 
 /**
  * Build update_profile transaction (for Dashboard profile edit).
+ * Phase 2: no price param — use buildAddTierTx to manage tiers.
  */
 export function buildUpdateProfileTx(
   profileId: string,
@@ -115,7 +137,6 @@ export function buildUpdateProfileTx(
     bio?: string | null;
     avatarBlobId?: string | null;
     suinsName?: string | null;
-    priceMist?: bigint | null;
   },
 ): Transaction {
   const tx = new Transaction();
@@ -130,7 +151,6 @@ export function buildUpdateProfileTx(
       tx.pure.option("string", updates.bio ?? null),
       tx.pure.option("string", updates.avatarBlobId ?? null),
       tx.pure.option("string", updates.suinsName ?? null),
-      tx.pure.option("u64", updates.priceMist ?? null),
       tx.object(CLOCK_OBJECT_ID),
     ],
   });
@@ -139,7 +159,7 @@ export function buildUpdateProfileTx(
 }
 
 /**
- * Build publish_content transaction.
+ * Build publish_content transaction with tier gating.
  */
 export function buildPublishContentTx(
   profileId: string,
@@ -148,6 +168,7 @@ export function buildPublishContentTx(
   description: string,
   blobId: string,
   contentType: "image" | "text" | "pdf",
+  minTierLevel: number,
 ): Transaction {
   const tx = new Transaction();
   const pkg = getPackageId();
@@ -161,6 +182,117 @@ export function buildPublishContentTx(
       tx.pure.string(description),
       tx.pure.string(blobId),
       tx.pure.string(contentType),
+      tx.pure.u64(minTierLevel),
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build add_tier transaction to add a new tier to a creator profile.
+ */
+export function buildAddTierTx(
+  profileId: string,
+  creatorCapId: string,
+  name: string,
+  description: string,
+  priceMist: bigint,
+  tierLevel: number,
+  durationMs: bigint | null,
+): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+
+  tx.moveCall({
+    target: `${pkg}::suipatron::add_tier`,
+    arguments: [
+      tx.object(profileId),
+      tx.object(creatorCapId),
+      tx.pure.string(name),
+      tx.pure.string(description),
+      tx.pure.u64(priceMist),
+      tx.pure.u64(tierLevel),
+      tx.pure.option("u64", durationMs),
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build tip transaction. Splits coin from gas and sends to creator.
+ */
+export function buildTipTx(profileId: string, amountMist: bigint): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+  const platform = getPlatformId();
+
+  const [payment] = tx.splitCoins(tx.gas, [tx.pure.u64(amountMist)]);
+
+  tx.moveCall({
+    target: `${pkg}::suipatron::tip`,
+    arguments: [
+      tx.object(platform),
+      tx.object(profileId),
+      payment,
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build renew_subscription transaction.
+ * Extends an existing subscription AccessPass.
+ */
+export function buildRenewSubscriptionTx(
+  profileId: string,
+  accessPassId: string,
+  priceMist: bigint,
+): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+  const platform = getPlatformId();
+
+  const [payment] = tx.splitCoins(tx.gas, [tx.pure.u64(priceMist)]);
+
+  tx.moveCall({
+    target: `${pkg}::suipatron::renew_subscription`,
+    arguments: [
+      tx.object(platform),
+      tx.object(profileId),
+      tx.object(accessPassId),
+      payment,
+      tx.object(CLOCK_OBJECT_ID),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build register_handle transaction for creator registry.
+ */
+export function buildRegisterHandleTx(
+  profileId: string,
+  creatorCapId: string,
+  handle: string,
+): Transaction {
+  const tx = new Transaction();
+  const pkg = getPackageId();
+  const registry = getRegistryId();
+
+  tx.moveCall({
+    target: `${pkg}::registry::register_handle`,
+    arguments: [
+      tx.object(registry),
+      tx.object(profileId),
+      tx.object(creatorCapId),
+      tx.pure.string(handle),
       tx.object(CLOCK_OBJECT_ID),
     ],
   });

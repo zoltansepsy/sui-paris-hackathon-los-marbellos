@@ -127,11 +127,15 @@ export function CreatorProfile() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
               <div className="text-center sm:text-left">
                 <p className="font-semibold text-lg mb-1">
-                  Support for {creator.price} SUI
+                  {creator.tiers.length > 0
+                    ? `Support from ${Math.min(...creator.tiers.map((t) => t.price))} SUI`
+                    : "Support this creator"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  One-time payment • Unlocks all {creator.contentCount} posts •
-                  Permanent access
+                  {creator.tiers.length > 1
+                    ? `${creator.tiers.length} tiers available`
+                    : "One-time payment"}{" "}
+                  • Unlocks {creator.contentCount} posts
                 </p>
               </div>
               <Button

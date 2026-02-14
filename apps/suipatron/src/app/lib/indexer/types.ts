@@ -1,7 +1,15 @@
 /**
- * Indexer data types aligned with SCOPE Section 12 and Move events.
+ * Indexer data types aligned with Phase 2 Move events and contract API.
  * Used by the event indexer and GET /api/creators, GET /api/creator/:id.
  */
+
+export interface IndexedTier {
+  name: string;
+  description: string;
+  price: number; // in MIST
+  tierLevel: number;
+  durationMs: number | null; // null = permanent, number = subscription period in ms
+}
 
 export interface IndexedCreator {
   profileId: string;
@@ -10,7 +18,7 @@ export interface IndexedCreator {
   bio: string;
   avatarBlobId?: string;
   suinsName?: string;
-  price: number;
+  tiers: IndexedTier[];
   contentCount: number;
   totalSupporters: number;
   createdAt: number;
@@ -23,6 +31,7 @@ export interface IndexedContent {
   description: string;
   blobId: string;
   contentType: string;
+  minTierLevel: number;
   createdAt: number;
 }
 
@@ -31,6 +40,8 @@ export interface IndexedAccessPurchase {
   creatorProfileId: string;
   supporter: string;
   amount: number;
+  tierLevel: number;
+  expiresAt: number | null; // null = permanent
   timestamp: number;
 }
 

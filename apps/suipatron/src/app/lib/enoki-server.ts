@@ -17,6 +17,10 @@ export function getAllowedMoveCallTargets(): string[] {
     `${PACKAGE_ID}::suipatron::publish_content`,
     `${PACKAGE_ID}::suipatron::purchase_access`,
     `${PACKAGE_ID}::suipatron::withdraw_earnings`,
+    `${PACKAGE_ID}::suipatron::add_tier`,
+    `${PACKAGE_ID}::suipatron::tip`,
+    `${PACKAGE_ID}::suipatron::renew_subscription`,
+    `${PACKAGE_ID}::registry::register_handle`,
   ];
 }
 

@@ -18,6 +18,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
+import { Label } from "../components/ui/label";
 import type { Creator } from "../lib/mock-data";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
@@ -37,7 +38,11 @@ function SupportModalWithSponsor(props: SupportModalProps) {
   const { addAccessPass } = useAccessPasses(user?.id);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
   const sponsorTx = useSponsorTransaction();
+
+  const tiers = creator.tiers;
+  const selectedTier = tiers[selectedTierIndex];
 
   const handleSupport = async () => {
     if (!user) {
@@ -46,16 +51,25 @@ function SupportModalWithSponsor(props: SupportModalProps) {
       return;
     }
 
+    if (!selectedTier) return;
+
     setIsProcessing(true);
     try {
-      const priceMist = BigInt(Math.round(creator.price * Number(SUI_TO_MIST)));
+      const priceMist = BigInt(
+        Math.round(selectedTier.price * Number(SUI_TO_MIST)),
+      );
       await sponsorTx.execute({
-        buildTx: () => buildPurchaseAccessTx(creator.id, priceMist),
+        buildTx: () =>
+          buildPurchaseAccessTx(creator.id, selectedTierIndex, priceMist),
         getSender: async () => user.id,
       });
-      addAccessPass(creator.id);
+      addAccessPass(
+        creator.id,
+        selectedTier.tierLevel,
+        selectedTier.durationMs ? Date.now() + selectedTier.durationMs : null,
+      );
       onOpenChange(false);
-      toast.success("Access granted! You can now view all content.");
+      toast.success("Access granted! You can now view content at this tier.");
       onSuccess?.();
     } catch (e) {
       toast.error(
@@ -73,9 +87,7 @@ function SupportModalWithSponsor(props: SupportModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Support Creator</DialogTitle>
-          <DialogDescription>
-            One-time payment for permanent access to all content
-          </DialogDescription>
+          <DialogDescription>Choose a tier to unlock content</DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-4 py-4">
           <Avatar className="h-16 w-16">
@@ -93,21 +105,61 @@ function SupportModalWithSponsor(props: SupportModalProps) {
             )}
           </div>
         </div>
+
+        {tiers.length > 1 && (
+          <div className="space-y-3 py-2">
+            <Label>Select a Tier</Label>
+            <div className="space-y-2">
+              {tiers.map((tier, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedTierIndex(idx)}
+                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                    selectedTierIndex === idx
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{tier.name}</span>
+                    <span className="font-semibold">{tier.price} SUI</span>
+                  </div>
+                  {tier.description && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {tier.description}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {tier.durationMs
+                      ? `${Math.round(tier.durationMs / 86400000)} day subscription`
+                      : "Permanent access"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4 py-4 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               Payment amount
             </span>
-            <span className="font-semibold text-lg">{creator.price} SUI</span>
+            <span className="font-semibold text-lg">
+              {selectedTier?.price ?? 0} SUI
+            </span>
           </div>
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Content unlocked</span>
-              <span className="font-medium">{creator.contentCount} posts</span>
+              <span className="text-muted-foreground">Tier</span>
+              <span className="font-medium">{selectedTier?.name ?? "—"}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Access type</span>
-              <span className="font-medium">Permanent</span>
+              <span className="font-medium">
+                {selectedTier?.durationMs ? "Subscription" : "Permanent"}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Platform fee</span>
@@ -134,7 +186,7 @@ function SupportModalWithSponsor(props: SupportModalProps) {
                 Processing...
               </>
             ) : (
-              `Support for ${creator.price} SUI`
+              `Support for ${selectedTier?.price ?? 0} SUI`
             )}
           </Button>
         </DialogFooter>
@@ -149,6 +201,10 @@ function SupportModalMock(props: SupportModalProps) {
   const { addAccessPass } = useAccessPasses(user?.id);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
+
+  const tiers = creator.tiers;
+  const selectedTier = tiers[selectedTierIndex];
 
   const handleSupport = async () => {
     if (!user) {
@@ -156,12 +212,17 @@ function SupportModalMock(props: SupportModalProps) {
       router.push("/?signin=true");
       return;
     }
+    if (!selectedTier) return;
     setIsProcessing(true);
     await new Promise((r) => setTimeout(r, 2000));
-    addAccessPass(creator.id);
+    addAccessPass(
+      creator.id,
+      selectedTier.tierLevel,
+      selectedTier.durationMs ? Date.now() + selectedTier.durationMs : null,
+    );
     setIsProcessing(false);
     onOpenChange(false);
-    toast.success("Access granted! You can now view all content.");
+    toast.success("Access granted! You can now view content at this tier.");
     onSuccess?.();
   };
 
@@ -170,9 +231,7 @@ function SupportModalMock(props: SupportModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Support Creator</DialogTitle>
-          <DialogDescription>
-            One-time payment for permanent access to all content
-          </DialogDescription>
+          <DialogDescription>Choose a tier to unlock content</DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-4 py-4">
           <Avatar className="h-16 w-16">
@@ -190,21 +249,61 @@ function SupportModalMock(props: SupportModalProps) {
             )}
           </div>
         </div>
+
+        {tiers.length > 1 && (
+          <div className="space-y-3 py-2">
+            <Label>Select a Tier</Label>
+            <div className="space-y-2">
+              {tiers.map((tier, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedTierIndex(idx)}
+                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                    selectedTierIndex === idx
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{tier.name}</span>
+                    <span className="font-semibold">{tier.price} SUI</span>
+                  </div>
+                  {tier.description && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {tier.description}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {tier.durationMs
+                      ? `${Math.round(tier.durationMs / 86400000)} day subscription`
+                      : "Permanent access"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4 py-4 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               Payment amount
             </span>
-            <span className="font-semibold text-lg">{creator.price} SUI</span>
+            <span className="font-semibold text-lg">
+              {selectedTier?.price ?? 0} SUI
+            </span>
           </div>
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Content unlocked</span>
-              <span className="font-medium">{creator.contentCount} posts</span>
+              <span className="text-muted-foreground">Tier</span>
+              <span className="font-medium">{selectedTier?.name ?? "—"}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Access type</span>
-              <span className="font-medium">Permanent</span>
+              <span className="font-medium">
+                {selectedTier?.durationMs ? "Subscription" : "Permanent"}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Platform fee</span>
@@ -231,7 +330,7 @@ function SupportModalMock(props: SupportModalProps) {
                 Processing...
               </>
             ) : (
-              `Support for ${creator.price} SUI`
+              `Support for ${selectedTier?.price ?? 0} SUI`
             )}
           </Button>
         </DialogFooter>

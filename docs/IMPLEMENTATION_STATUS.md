@@ -86,6 +86,54 @@ All Phase 2 features implemented on branch `zoltan/smart-contract-phase2`. **45/
 12. Registry (4)
 13. Full Flow E2E (2)
 
+### Service Layer — Phase 2 Tier Support
+
+All frontend service-layer code updated from Phase 1 flat-price model to Phase 2 multi-tier model. On branch `zoltan/phase-2`.
+
+**Type definitions updated:**
+- `IndexedTier` added to `src/app/lib/indexer/types.ts` — tier representation for indexer (price in MIST)
+- `IndexedCreator.price` replaced with `IndexedCreator.tiers: IndexedTier[]`
+- `IndexedContent` gained `minTierLevel: number`
+- `IndexedAccessPurchase` gained `tierLevel: number` and `expiresAt: number | null`
+- `Tier` interface added to `src/shared/types/creator.types.ts` — tier representation for UI (price in SUI)
+- `Creator.price` replaced with `Creator.tiers: Tier[]`
+- `Content` gained `minTierLevel: number`
+- `CreatorProfile.price` replaced with `CreatorProfile.tiers: Tier[]` in `user.types.ts`
+
+**PTB builders rewritten** (`src/app/lib/ptb/index.ts`):
+- All 9 builders match Phase 2 contract API signatures (create_profile with tier params, purchase_access with tier_index, publish_content with min_tier_level, add_tier, tip, renew_subscription, register_handle)
+- Added `getRegistryId()` helper reading `NEXT_PUBLIC_REGISTRY_ID` env var
+
+**Enoki server allowlist** (`src/app/lib/enoki-server.ts`):
+- Added `add_tier`, `tip`, `renew_subscription`, `registry::register_handle` to allowed move call targets
+
+**Indexer updated** (`src/app/lib/indexer/run.ts`):
+- Added `TierAdded`, `TipReceived`, `SubscriptionRenewed` to EVENT_TYPES
+- `ProfileCreated`/`ProfileUpdated` handlers read `tiers` vector from on-chain object
+- `ContentPublished` handler reads `min_tier_level`
+- `AccessPurchased` handler reads `tier_level` and `expires_at`
+- `TierAdded` handler re-fetches profile object and updates tiers
+
+**Indexer stores updated:**
+- Supabase store (`store-supabase.ts`): `CreatorRow.tiers` as JSONB, `ContentRow.min_tier_level`, `PurchaseRow.tier_level`/`expires_at`
+- New migration: `supabase/migrations/20250214100000_add_tiers.sql` — adds `tiers` JSONB column, drops `price`, adds `min_tier_level`, `tier_level`, `expires_at`
+
+**Access pass hook** (`src/app/lib/access-pass.ts`):
+- `AccessPassEntry` stores `{ creatorId, tierLevel, expiresAt }` instead of just creator ID strings
+- `hasAccessAtTier(creatorId, minTierLevel)` checks tier level AND subscription expiry
+- Backward-compatible migration from legacy `string[]` format
+
+**Mock data** (`src/app/lib/mock-data.ts`):
+- All mock creators have `tiers` arrays instead of flat `price`
+- All mock content has `minTierLevel`
+
+**Components updated for tiers:**
+- `CreateProfileForm.tsx` — initial tier fields (name, description, price), calls updated `buildCreateProfileTx`
+- `SupportModal.tsx` — tier selection UI (radio group), calls `buildPurchaseAccessTx(profileId, tierIndex, priceMist)`
+- `CreatorCard.tsx` — shows "from X SUI" (lowest tier price)
+- `CreatorProfile.tsx` — shows tier count and lowest price in support CTA
+- `Dashboard.tsx` — displays tiers list instead of flat price input, `handleBecomeCreator` creates default tier
+
 ### Documentation
 
 | File | Description |
@@ -145,15 +193,15 @@ After publishing, record:
 ### 5. Integration Hooks / Services (P3–P14)
 
 PTB builders (transaction construction) — **Updated for Phase 2 API:**
-- [ ] `buildCreateProfileTx(name, bio, tierName, tierDesc, tierPrice, tierLevel, tierDurationMs)` — creates CreatorProfile + CreatorCap
-- [ ] `buildUpdateProfileTx(profileId, updates)` — updates profile metadata (no price param)
-- [ ] `buildAddTierTx(profileId, name, desc, price, tierLevel, durationMs)` — adds tier to profile
-- [ ] `buildPublishContentTx(profileId, title, desc, blobId, contentType, minTierLevel)` — publishes content with tier gating
-- [ ] `buildPurchaseAccessTx(platformId, profileId, tierIndex, price)` — purchases access at specific tier
-- [ ] `buildWithdrawTx(profileId)` — withdraws creator earnings
-- [ ] `buildTipTx(platformId, profileId, amount)` — sends one-time tip
-- [ ] `buildRenewSubscriptionTx(platformId, profileId, accessPassId, price)` — renews subscription
-- [ ] `buildRegisterHandleTx(registryId, profileId, handle)` — registers creator handle
+- [x] `buildCreateProfileTx(name, bio, tierName, tierDesc, tierPrice, tierLevel, tierDurationMs)` — creates CreatorProfile + CreatorCap
+- [x] `buildUpdateProfileTx(profileId, creatorCapId, updates)` — updates profile metadata (no price param)
+- [x] `buildAddTierTx(profileId, creatorCapId, name, desc, price, tierLevel, durationMs)` — adds tier to profile
+- [x] `buildPublishContentTx(profileId, creatorCapId, title, desc, blobId, contentType, minTierLevel)` — publishes content with tier gating
+- [x] `buildPurchaseAccessTx(profileId, tierIndex, priceMist)` — purchases access at specific tier
+- [x] `buildWithdrawEarningsTx(profileId, creatorCapId)` — withdraws creator earnings
+- [x] `buildTipTx(profileId, amountMist)` — sends one-time tip
+- [x] `buildRenewSubscriptionTx(profileId, accessPassId, priceMist)` — renews subscription
+- [x] `buildRegisterHandleTx(profileId, creatorCapId, handle)` — registers creator handle
 
 SEAL integration — **Updated for Phase 2 identity format:**
 - [ ] `encryptContent(data, creatorProfileId, minTierLevel, packageId)` — SEAL encrypt with 40-byte identity (32-byte ID + 8-byte LE tier level)
@@ -477,4 +525,4 @@ cd apps/suipatron && pnpm dev
 
 ---
 
-*Last updated: Phase 2 smart contracts completed (45/45 tests pass) on branch `zoltan/smart-contract-phase2`. Needs testnet deployment. Frontend, backend, and integrations are next.*
+*Last updated: Phase 2 service layer tier support completed on branch `zoltan/phase-2`. Types, PTB builders (9), indexer, stores, access-pass hook, mock data, and all components updated for multi-tier model. Smart contracts (45/45 tests) on `zoltan/smart-contract-phase2`. Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*

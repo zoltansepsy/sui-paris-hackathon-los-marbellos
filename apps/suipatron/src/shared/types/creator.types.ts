@@ -1,7 +1,15 @@
 /**
- * Creator and Content domain types.
+ * Creator, Tier, and Content domain types.
  * Used by mock-data, frontend pages, API responses, and services.
  */
+
+export interface Tier {
+  name: string;
+  description: string;
+  price: number; // in SUI (display units)
+  tierLevel: number;
+  durationMs: number | null; // null = permanent, number = subscription period in ms
+}
 
 export interface CreatorsPageResult {
   creators: Array<{
@@ -11,7 +19,7 @@ export interface CreatorsPageResult {
     bio: string;
     avatarBlobId?: string;
     suinsName?: string;
-    price: number;
+    tiers: Tier[];
     contentCount: number;
     totalSupporters: number;
     createdAt: number;
@@ -27,7 +35,7 @@ export interface Creator {
   avatar: string;
   suinsName?: string;
   bio?: string;
-  price: number;
+  tiers: Tier[];
   balance?: number;
   contentCount: number;
   supporterCount: number;
@@ -41,5 +49,6 @@ export interface Content {
   type: "image" | "text" | "pdf";
   thumbnail?: string;
   isLocked: boolean;
+  minTierLevel: number;
   createdAt: Date;
 }

@@ -1,5 +1,5 @@
 /**
- * Supabase-backed indexer store. Uses tables: indexer_creators, indexer_content,
+ * Supabase-backed indexer store (Phase 2). Uses tables: indexer_creators, indexer_content,
  * indexer_access_purchases, indexer_cursors. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
  */
 
@@ -9,6 +9,7 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedTier,
 } from "./types";
 
 type CreatorRow = {
@@ -18,7 +19,7 @@ type CreatorRow = {
   bio: string;
   avatar_blob_id: string | null;
   suins_name: string | null;
-  price: number;
+  tiers: string; // JSONB serialized
   content_count: number;
   total_supporters: number;
   created_at: number;
@@ -31,6 +32,7 @@ type ContentRow = {
   description: string;
   blob_id: string;
   content_type: string;
+  min_tier_level: number;
   created_at: number;
 };
 
@@ -39,8 +41,22 @@ type PurchaseRow = {
   creator_profile_id: string;
   supporter: string;
   amount: number;
+  tier_level: number;
+  expires_at: number | null;
   timestamp: number;
 };
+
+function parseTiersJson(raw: unknown): IndexedTier[] {
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as IndexedTier[];
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(raw)) return raw as IndexedTier[];
+  return [];
+}
 
 function rowToCreator(r: CreatorRow): IndexedCreator {
   return {
@@ -50,7 +66,7 @@ function rowToCreator(r: CreatorRow): IndexedCreator {
     bio: r.bio ?? "",
     avatarBlobId: r.avatar_blob_id ?? undefined,
     suinsName: r.suins_name ?? undefined,
-    price: Number(r.price),
+    tiers: parseTiersJson(r.tiers),
     contentCount: r.content_count ?? 0,
     totalSupporters: r.total_supporters ?? 0,
     createdAt: Number(r.created_at),
@@ -65,7 +81,7 @@ function creatorToRow(c: IndexedCreator): CreatorRow {
     bio: c.bio ?? "",
     avatar_blob_id: c.avatarBlobId ?? null,
     suins_name: c.suinsName ?? null,
-    price: c.price,
+    tiers: JSON.stringify(c.tiers),
     content_count: c.contentCount ?? 0,
     total_supporters: c.totalSupporters ?? 0,
     created_at: c.createdAt,
@@ -80,6 +96,7 @@ function rowToContent(r: ContentRow): IndexedContent {
     description: r.description ?? "",
     blobId: r.blob_id,
     contentType: r.content_type,
+    minTierLevel: Number(r.min_tier_level ?? 0),
     createdAt: Number(r.created_at),
   };
 }
@@ -92,6 +109,7 @@ function contentToRow(c: IndexedContent): ContentRow {
     description: c.description ?? "",
     blob_id: c.blobId,
     content_type: c.contentType,
+    min_tier_level: c.minTierLevel,
     created_at: c.createdAt,
   };
 }
@@ -102,6 +120,8 @@ function rowToPurchase(r: PurchaseRow): IndexedAccessPurchase {
     creatorProfileId: r.creator_profile_id,
     supporter: r.supporter,
     amount: Number(r.amount),
+    tierLevel: Number(r.tier_level ?? 1),
+    expiresAt: r.expires_at != null ? Number(r.expires_at) : null,
     timestamp: Number(r.timestamp),
   };
 }
@@ -143,6 +163,8 @@ export function createSupabaseStore(): IndexerStore {
         creator_profile_id: purchase.creatorProfileId,
         supporter: purchase.supporter,
         amount: purchase.amount,
+        tier_level: purchase.tierLevel,
+        expires_at: purchase.expiresAt,
         timestamp: purchase.timestamp,
       });
       const { data: creator } = await supabase

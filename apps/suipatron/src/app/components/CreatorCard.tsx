@@ -50,7 +50,9 @@ export function CreatorCard({ creator }: CreatorCardProps) {
             </span>
           </div>
           <span className="font-semibold text-foreground">
-            {creator.price} SUI
+            {creator.tiers.length > 0
+              ? `from ${Math.min(...creator.tiers.map((t) => t.price))} SUI`
+              : "Free"}
           </span>
         </CardFooter>
       </Card>
