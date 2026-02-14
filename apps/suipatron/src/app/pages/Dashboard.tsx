@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import { isEnokiConfigured } from "../lib/enoki-provider";
+import { CreateProfileForm } from "../components/CreateProfileForm";
+import { WithdrawButton } from "../components/WithdrawButton";
 import {
   Card,
   CardContent,
@@ -140,9 +143,17 @@ export function Dashboard() {
               </div>
             </div>
 
-            <Button onClick={handleBecomeCreator} size="lg" className="w-full">
-              Set Up Creator Profile
-            </Button>
+            {isEnokiConfigured ? (
+              <CreateProfileForm onSuccess={() => {}} />
+            ) : (
+              <Button
+                onClick={handleBecomeCreator}
+                size="lg"
+                className="w-full"
+              >
+                Set Up Creator Profile
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -175,9 +186,17 @@ export function Dashboard() {
                 <div className="text-2xl font-bold">
                   {user.creatorProfile?.balance || 0} SUI
                 </div>
-                <Button variant="outline" size="sm" className="mt-3">
-                  Withdraw
-                </Button>
+                {isEnokiConfigured ? (
+                  <WithdrawButton
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                  />
+                ) : (
+                  <Button variant="outline" size="sm" className="mt-3" disabled>
+                    Withdraw
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
