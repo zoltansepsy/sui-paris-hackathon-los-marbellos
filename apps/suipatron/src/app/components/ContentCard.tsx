@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Lock, Image as ImageIcon, FileText, BookOpen, Loader2 } from "lucide-react";
+import {
+  Lock,
+  Image as ImageIcon,
+  FileText,
+  BookOpen,
+  Loader2,
+} from "lucide-react";
 import type { Content } from "@/shared/types/creator.types";
 import { useWalrusDownload } from "../hooks/useContent";
 
@@ -14,7 +20,12 @@ interface ContentCardProps {
   blobId?: string; // Walrus blob ID for fetching content
 }
 
-export function ContentCard({ content, isLocked, onClick, blobId }: ContentCardProps) {
+export function ContentCard({
+  content,
+  isLocked,
+  onClick,
+  blobId,
+}: ContentCardProps) {
   const { download } = useWalrusDownload();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoadingBlob, setIsLoadingBlob] = useState(false);

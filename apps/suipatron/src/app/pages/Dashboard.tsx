@@ -41,7 +41,14 @@ import {
 } from "../components/ui/dialog";
 import { ContentCard } from "../components/ContentCard";
 import { mockContent } from "../lib/mock-data";
-import { DollarSign, Users, FileUp, Loader2, CheckCircle2, ExternalLink } from "lucide-react";
+import {
+  DollarSign,
+  Users,
+  FileUp,
+  Loader2,
+  CheckCircle2,
+  ExternalLink,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 
@@ -206,7 +213,10 @@ export function Dashboard() {
 
       // Log blob ID for SEAL verification
       console.log("🔒 SEAL VERIFICATION - Blob ID:", result.blobId);
-      console.log("🔗 Check encrypted blob at:", `https://aggregator.walrus-testnet.walrus.space/blobs/${result.blobId}`);
+      console.log(
+        "🔗 Check encrypted blob at:",
+        `https://aggregator.walrus-testnet.walrus.space/blobs/${result.blobId}`,
+      );
 
       toast.success("Content uploaded to Walrus and published on-chain!");
       setShowUploadModal(false);
@@ -501,7 +511,14 @@ export function Dashboard() {
                       : null;
 
                     // Debug: log to see if blobId exists
-                    console.log("Dashboard Content:", content.title, "BlobId:", blobId, "Has URL:", !!blobUrl);
+                    console.log(
+                      "Dashboard Content:",
+                      content.title,
+                      "BlobId:",
+                      blobId,
+                      "Has URL:",
+                      !!blobUrl,
+                    );
 
                     return (
                       <div key={content.id} className="space-y-2">
@@ -534,7 +551,9 @@ export function Dashboard() {
                               onClick={() => {
                                 // The decrypted version is already shown in the ContentCard above
                                 // For demo, we can indicate this or implement a full-screen view
-                                alert("The decrypted version is displayed in the card above. The encrypted blob (left button) shows garbage data from Walrus.");
+                                alert(
+                                  "The decrypted version is displayed in the card above. The encrypted blob (left button) shows garbage data from Walrus.",
+                                );
                               }}
                             >
                               ✓ Decrypted
@@ -703,12 +722,33 @@ export function Dashboard() {
             {/* SuiNS Auto-Resolution Info */}
             <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
               <div className="flex items-start space-x-2">
-                <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <div className="text-xs text-blue-900 dark:text-blue-100">
                   <p className="font-semibold mb-1">Have a real SuiNS name?</p>
-                  <p>If you own a SuiNS name (e.g., alice.sui), it will automatically appear on your profile! Register at <a href="https://suins.io" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-700">suins.io</a></p>
+                  <p>
+                    If you own a SuiNS name (e.g., alice.sui), it will
+                    automatically appear on your profile! Register at{" "}
+                    <a
+                      href="https://suins.io"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-blue-700"
+                    >
+                      suins.io
+                    </a>
+                  </p>
                 </div>
               </div>
             </div>
