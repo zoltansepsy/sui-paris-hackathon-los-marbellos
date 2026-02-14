@@ -4,13 +4,23 @@ import { useState } from "react";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { CreatorCard } from "../components/CreatorCard";
+import { LoadingState } from "../components/LoadingState";
+import { useCreatorProfiles } from "../hooks/useCreator";
+import { creatorProfileToCreator } from "../lib/adapters";
 import { mockCreators } from "../lib/mock-data";
 import { Search } from "lucide-react";
 
 export function Explore() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { data: profiles, isLoading } = useCreatorProfiles();
 
-  const filteredCreators = mockCreators.filter(
+  // Use on-chain data when available, fall back to mock data
+  const creators =
+    profiles && profiles.length > 0
+      ? profiles.map(creatorProfileToCreator)
+      : mockCreators;
+
+  const filteredCreators = creators.filter(
     (creator) =>
       creator.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       creator.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,7 +54,9 @@ export function Explore() {
 
       <section className="py-12 px-4 flex-1">
         <div className="container mx-auto">
-          {filteredCreators.length > 0 ? (
+          {isLoading ? (
+            <LoadingState />
+          ) : filteredCreators.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCreators.map((creator) => (
                 <CreatorCard key={creator.id} creator={creator} />

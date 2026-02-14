@@ -3,7 +3,13 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
-import { useAccessPasses } from "../lib/access-pass";
+import { useMyAccessPasses } from "../hooks/useAccessPass";
+import { useCreatorProfile, useContentList } from "../hooks/useCreator";
+import {
+  creatorProfileToCreator,
+  onchainContentToContent,
+} from "../lib/adapters";
+import { LoadingState } from "../components/LoadingState";
 import {
   Card,
   CardContent,
@@ -15,11 +21,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { ContentCard } from "../components/ContentCard";
 import { mockCreators, mockContent } from "../lib/mock-data";
+import type { Creator, Content } from "@/shared/types/creator.types";
 import { Heart } from "lucide-react";
 
 export function Feed() {
-  const { user } = useAuth();
-  const { accessPasses } = useAccessPasses(user?.id);
+  const { user, walletAddress } = useAuth();
+  const { data: onchainPasses, isLoading: passesLoading } = useMyAccessPasses(
+    walletAddress ?? undefined,
+  );
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -38,7 +47,7 @@ export function Feed() {
               Your feed shows content from creators you support
             </p>
             <Link href="/?signin=true">
-              <Button className="w-full">Sign in with Google</Button>
+              <Button className="w-full">Connect Wallet</Button>
             </Link>
           </CardContent>
         </Card>
@@ -46,21 +55,23 @@ export function Feed() {
     );
   }
 
-  const supportedCreators = mockCreators.filter((c) =>
-    accessPasses.includes(c.id),
-  );
+  // Get unique creator profile IDs from access passes
+  const supportedCreatorIds = onchainPasses
+    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
+    : [];
 
-  const feedContent = supportedCreators
-    .flatMap((creator) => {
-      const creatorContent = mockContent.filter(
-        (c) => c.creatorId === creator.id,
-      );
-      return creatorContent.map((content) => ({
-        ...content,
-        creator,
-      }));
-    })
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // Fall back to mock data when no on-chain passes
+  const supportedCreators: Creator[] =
+    supportedCreatorIds.length > 0
+      ? [] // Will be populated from on-chain data in future iteration
+      : mockCreators.filter((c) => false); // No mock fallback for feed
+
+  // For now, use supportedCreatorIds to show creator links
+  const feedContent: (Content & { creator: Creator })[] = [];
+
+  if (passesLoading) {
+    return <LoadingState />;
+  }
 
   if (supportedCreators.length === 0) {
     return (

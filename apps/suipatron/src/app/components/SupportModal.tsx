@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
-import { useAccessPasses } from "../lib/access-pass";
+import { useSuiPatronTransactions } from "../hooks/useTransactions";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,8 @@ import {
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import type { Creator } from "../lib/mock-data";
+import type { Creator } from "@/shared/types/creator.types";
+import { MIST_PER_SUI } from "../constants";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
@@ -32,8 +34,9 @@ export function SupportModal({
   onOpenChange,
   onSuccess,
 }: SupportModalProps) {
-  const { user } = useAuth();
-  const { addAccessPass } = useAccessPasses(user?.id);
+  const { user, walletAddress } = useAuth();
+  const { purchaseAccess, isPending } = useSuiPatronTransactions();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -46,18 +49,29 @@ export function SupportModal({
 
     setIsProcessing(true);
 
-    // Simulate transaction processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      if (walletAddress) {
+        // Real on-chain transaction
+        await purchaseAccess(creator.id, creator.price * MIST_PER_SUI);
+        queryClient.invalidateQueries({ queryKey: ["hasAccess"] });
+        queryClient.invalidateQueries({ queryKey: ["myAccessPasses"] });
+      } else {
+        // Mock fallback for dev without wallet
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
 
-    // Add access pass (client-only, uses dynamic import)
-    addAccessPass(creator.id);
+      setIsProcessing(false);
+      onOpenChange(false);
+      toast.success("Access granted! You can now view all content.");
 
-    setIsProcessing(false);
-    onOpenChange(false);
-    toast.success("Access granted! You can now view all content.");
-
-    if (onSuccess) {
-      onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      setIsProcessing(false);
+      toast.error(
+        error instanceof Error ? error.message : "Transaction failed",
+      );
     }
   };
 
@@ -122,12 +136,12 @@ export function SupportModal({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
+            disabled={isProcessing || isPending}
           >
             Cancel
           </Button>
-          <Button onClick={handleSupport} disabled={isProcessing}>
-            {isProcessing ? (
+          <Button onClick={handleSupport} disabled={isProcessing || isPending}>
+            {isProcessing || isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...

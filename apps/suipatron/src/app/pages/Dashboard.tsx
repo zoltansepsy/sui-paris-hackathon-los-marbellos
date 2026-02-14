@@ -4,6 +4,16 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
 import {
+  useMyCreatorProfile,
+  useMyCreatorCap,
+  useContentList,
+} from "../hooks/useCreator";
+import { useSuiPatronTransactions } from "../hooks/useTransactions";
+import { useContentUpload } from "../hooks/useContent";
+import { onchainContentToContent } from "../lib/adapters";
+import { MIST_PER_SUI } from "../constants";
+import { useQueryClient } from "@tanstack/react-query";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -30,18 +40,36 @@ import { DollarSign, Users, FileUp, Loader2, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function Dashboard() {
-  const { user, updateUser } = useAuth();
+  const { user, walletAddress, updateUser } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSuiNSModal, setShowSuiNSModal] = useState(false);
 
+  // On-chain queries
+  const { data: myProfile } = useMyCreatorProfile(walletAddress ?? undefined);
+  const { data: myCreatorCap } = useMyCreatorCap(walletAddress ?? undefined);
+  const { data: onchainContent } = useContentList(myProfile?.objectId);
+  const {
+    createProfile,
+    updateProfile,
+    withdrawEarnings,
+    isPending: txPending,
+  } = useSuiPatronTransactions();
+  const { upload: uploadContent, isPending: uploadPending } =
+    useContentUpload();
+
   // Form states
-  const [name, setName] = useState(user?.name || "");
-  const [bio, setBio] = useState(user?.creatorProfile?.bio || "");
+  const [name, setName] = useState(myProfile?.name || user?.name || "");
+  const [bio, setBio] = useState(
+    myProfile?.bio || user?.creatorProfile?.bio || "",
+  );
   const [price, setPrice] = useState(
-    user?.creatorProfile?.price?.toString() || "5",
+    myProfile
+      ? (myProfile.price / MIST_PER_SUI).toString()
+      : user?.creatorProfile?.price?.toString() || "5",
   );
   const [suinsInput, setSuinsInput] = useState("");
 
@@ -53,37 +81,69 @@ export function Dashboard() {
 
   if (!user) return null;
 
-  const handleBecomeCreator = () => {
-    updateUser({
-      isCreator: true,
-      creatorProfile: {
-        bio: "",
-        price: 5,
-        balance: 0,
-        contentCount: 0,
-        supporterCount: 0,
-      },
-    });
+  const handleBecomeCreator = async () => {
+    if (walletAddress) {
+      try {
+        const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
+        await createProfile(name || user!.name, bio, priceInMist);
+        queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
+        queryClient.invalidateQueries({ queryKey: ["myCreatorCap"] });
+        toast.success("Creator profile created on-chain!");
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create profile",
+        );
+        return;
+      }
+    } else {
+      updateUser({
+        isCreator: true,
+        creatorProfile: {
+          bio: "",
+          price: 5,
+          balance: 0,
+          contentCount: 0,
+          supporterCount: 0,
+        },
+      });
+    }
     setIsEditing(true);
     toast.success("Welcome! Set up your creator profile.");
   };
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    updateUser({
-      name,
-      creatorProfile: {
-        ...user.creatorProfile,
-        bio,
-        price: parseFloat(price) || 5,
-      },
-    });
+    try {
+      if (walletAddress && myProfile && myCreatorCap) {
+        const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
+        await updateProfile(myProfile.objectId, myCreatorCap.objectId, {
+          name,
+          bio,
+          price: priceInMist,
+        });
+        queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
+        toast.success("Profile updated on-chain!");
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateUser({
+          name,
+          creatorProfile: {
+            ...user!.creatorProfile,
+            bio,
+            price: parseFloat(price) || 5,
+          },
+        });
+        toast.success("Profile updated successfully");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update profile",
+      );
+    }
 
     setIsSaving(false);
     setIsEditing(false);
-    toast.success("Profile updated successfully");
   };
 
   const handleClaimSuiNS = async () => {
@@ -102,7 +162,10 @@ export function Dashboard() {
     toast.success("SuiNS name claimed successfully!");
   };
 
-  if (!user.isCreator) {
+  // User is a creator if they have an on-chain profile or the mock flag is set
+  const isCreator = !!myProfile || !!user.isCreator;
+
+  if (!isCreator) {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center px-4 py-12">
         <Card className="max-w-2xl w-full">
@@ -149,7 +212,19 @@ export function Dashboard() {
     );
   }
 
-  const userContent = mockContent.filter((c) => c.creatorId === user.id);
+  const userContent =
+    onchainContent && onchainContent.length > 0
+      ? onchainContent.map((c) =>
+          onchainContentToContent(c, myProfile?.objectId || user.id, true),
+        )
+      : mockContent.filter((c) => c.creatorId === user.id);
+
+  const displayBalance = myProfile
+    ? myProfile.balance / MIST_PER_SUI
+    : user.creatorProfile?.balance || 0;
+  const displaySupporters = myProfile
+    ? myProfile.totalSupporters
+    : user.creatorProfile?.supporterCount || 0;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -172,11 +247,43 @@ export function Dashboard() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {user.creatorProfile?.balance || 0} SUI
-                </div>
-                <Button variant="outline" size="sm" className="mt-3">
-                  Withdraw
+                <div className="text-2xl font-bold">{displayBalance} SUI</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  disabled={txPending || displayBalance === 0}
+                  onClick={async () => {
+                    if (walletAddress && myProfile && myCreatorCap) {
+                      try {
+                        await withdrawEarnings(
+                          myProfile.objectId,
+                          myCreatorCap.objectId,
+                        );
+                        queryClient.invalidateQueries({
+                          queryKey: ["myCreatorProfile"],
+                        });
+                        toast.success("Earnings withdrawn!");
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Withdrawal failed",
+                        );
+                      }
+                    } else {
+                      toast.error("Connect wallet to withdraw");
+                    }
+                  }}
+                >
+                  {txPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Withdrawing...
+                    </>
+                  ) : (
+                    "Withdraw"
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -189,9 +296,7 @@ export function Dashboard() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {user.creatorProfile?.supporterCount || 0}
-                </div>
+                <div className="text-2xl font-bold">{displaySupporters}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Total supporters
                 </p>
@@ -395,12 +500,23 @@ export function Dashboard() {
               Cancel
             </Button>
             <Button
+              disabled={uploadPending}
               onClick={() => {
+                // Upload integration — currently shows success toast
+                // Full SEAL+Walrus upload requires file input wiring
                 toast.success("Content uploaded successfully!");
                 setShowUploadModal(false);
+                queryClient.invalidateQueries({ queryKey: ["contentList"] });
               }}
             >
-              Publish
+              {uploadPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Publish"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

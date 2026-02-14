@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Lock, Image as ImageIcon, FileText, FileType } from "lucide-react";
-import { Content } from "../lib/mock-data";
+import type { Content } from "@/shared/types/creator.types";
 
 interface ContentCardProps {
   content: Content;

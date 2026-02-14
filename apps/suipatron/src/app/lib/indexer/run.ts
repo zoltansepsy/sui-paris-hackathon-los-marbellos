@@ -4,7 +4,7 @@
  * Uses getObject to fill bio/title/description not present in events.
  */
 
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { getIndexerStore } from "./get-store";
 import type {
   IndexedCreator,
@@ -76,7 +76,13 @@ export async function runIndexer(): Promise<{
   errors: string[];
 }> {
   const packageId = getPackageId();
-  const client = new SuiClient({ url: getRpcUrl() });
+  const network = (process.env.NEXT_PUBLIC_SUI_NETWORK ??
+    process.env.VITE_SUI_NETWORK ??
+    "testnet") as "testnet" | "devnet" | "mainnet";
+  const client = new SuiJsonRpcClient({
+    network,
+    url: getJsonRpcFullnodeUrl(network),
+  });
   const store = getIndexerStore();
   const fullType = (name: string) => `${packageId}::suipatron::${name}`;
   let processed = 0;
