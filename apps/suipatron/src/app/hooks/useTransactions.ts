@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useCallback } from "react";
-import { useSignAndExecuteTransaction, useSuiClient, useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useSignAndExecuteTransaction,
+  useSuiClient,
+  useCurrentAccount,
+} from "@mysten/dapp-kit";
 import { useNetworkVariable } from "@hack/blockchain/sdk/networkConfig";
 import { createTransactionService } from "../services/transactionService";
 import type { ProfileUpdateParams } from "../types/onchain";
 
 /**
- * Hook providing transaction execution methods for all SuiPatron entry functions.
- *
- * Each method builds the PTB then signs and executes via the connected wallet.
+ * Wallet-based transaction execution (dapp-kit useSignAndExecuteTransaction).
+ * Used for create profile, purchase access, update profile, withdraw, and content publish.
  */
 export function useSuiPatronTransactions() {
   const suiClient = useSuiClient();

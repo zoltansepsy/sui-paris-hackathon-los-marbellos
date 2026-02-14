@@ -5,7 +5,11 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useNetworkVariable } from "@hack/blockchain/sdk/networkConfig";
 import { createCreatorService } from "../services/creatorService";
-import type { Content } from "../types/onchain";
+import {
+  indexedCreatorToCreator,
+  indexedContentToContent,
+} from "../lib/adapters";
+import type { Content as OnchainContent } from "../types/onchain";
 
 /**
  * Hook to get a single CreatorProfile by ID.
@@ -130,7 +134,118 @@ export function useCreatorProfilesByIds(profileIds: string[] | undefined) {
 
 export interface FeedContentByCreator {
   profileId: string;
-  contents: Content[];
+  contents: OnchainContent[];
+}
+
+/** List creators from indexer API (cursor pagination). Use when indexer is running. */
+export function useIndexedCreators(limit = 20, cursor?: string | null) {
+  const queryKey = ["indexedCreators", limit, cursor ?? ""];
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set("cursor", cursor);
+      const res = await fetch(`/api/creators?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch creators");
+      const data = (await res.json()) as {
+        creators: Array<{
+          profileId: string;
+          owner: string;
+          name: string;
+          bio: string;
+          avatarBlobId?: string;
+          suinsName?: string;
+          price: number;
+          contentCount: number;
+          totalSupporters: number;
+          createdAt: number;
+        }>;
+        nextCursor: string | null;
+        hasNextPage: boolean;
+      };
+      return {
+        creators: data.creators.map(indexedCreatorToCreator),
+        nextCursor: data.nextCursor,
+        hasNextPage: data.hasNextPage,
+      };
+    },
+    staleTime: 60_000,
+  });
+
+  return {
+    creators: query.data?.creators ?? [],
+    nextCursor: query.data?.nextCursor ?? null,
+    hasNextPage: query.data?.hasNextPage ?? false,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+    error: query.error,
+  };
+}
+
+/** Single creator + content from indexer API. Returns isNotFound on 404 (use on-chain fallback). */
+export function useIndexedCreator(
+  profileId: string | undefined,
+  hasAccess: boolean,
+) {
+  const query = useQuery({
+    queryKey: ["indexedCreator", profileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/creator/${profileId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to fetch creator");
+      const data = (await res.json()) as {
+        creator: {
+          profileId: string;
+          owner: string;
+          name: string;
+          bio: string;
+          avatarBlobId?: string;
+          suinsName?: string;
+          price: number;
+          contentCount: number;
+          totalSupporters: number;
+          createdAt: number;
+        };
+        content: Array<{
+          contentId: string;
+          creatorProfileId: string;
+          title: string;
+          description: string;
+          blobId: string;
+          contentType: string;
+          createdAt: number;
+        }>;
+      };
+      return {
+        creator: indexedCreatorToCreator(data.creator),
+        content: data.content.map((c) =>
+          indexedContentToContent(
+            {
+              contentId: c.contentId,
+              creatorProfileId: c.creatorProfileId,
+              title: c.title,
+              description: c.description,
+              blobId: c.blobId,
+              contentType: c.contentType,
+              createdAt: c.createdAt,
+            },
+            hasAccess,
+          ),
+        ),
+      };
+    },
+    enabled: !!profileId,
+    staleTime: 60_000,
+  });
+
+  return {
+    creator: query.data?.creator ?? undefined,
+    content: query.data?.content ?? [],
+    isLoading: query.isLoading,
+    isNotFound: query.isSuccess && query.data === null,
+    refetch: query.refetch,
+  };
 }
 
 /**

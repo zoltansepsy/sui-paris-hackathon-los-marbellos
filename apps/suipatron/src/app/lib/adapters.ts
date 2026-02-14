@@ -1,7 +1,7 @@
 /**
- * Type adapters: convert on-chain types to UI types.
+ * Type adapters: convert on-chain types and indexer types to UI types.
  * This lets existing UI components (CreatorCard, ContentCard, etc.)
- * work unchanged with real on-chain data.
+ * work unchanged with real on-chain or indexed data.
  */
 
 import type {
@@ -9,6 +9,7 @@ import type {
   Content as OnchainContent,
 } from "../types/onchain";
 import type { Creator, Content } from "@/shared/types/creator.types";
+import type { IndexedCreator, IndexedContent } from "../lib/indexer/types";
 import { MIST_PER_SUI, WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 
 export function creatorProfileToCreator(profile: CreatorProfile): Creator {
@@ -43,5 +44,43 @@ export function onchainContentToContent(
     isLocked: !hasAccess,
     createdAt: new Date(content.createdAt),
     blobId: content.blobId, // Preserve blobId for Walrus fetching
+  };
+}
+
+/** Indexer → UI: map IndexedCreator to Creator (for Explore / API responses). */
+export function indexedCreatorToCreator(creator: IndexedCreator): Creator {
+  return {
+    id: creator.profileId,
+    name: creator.name,
+    email: "",
+    avatar: creator.avatarBlobId
+      ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${creator.avatarBlobId}`
+      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${creator.profileId}`,
+    suinsName: creator.suinsName ?? undefined,
+    bio: creator.bio ?? undefined,
+    price:
+      typeof creator.price === "number"
+        ? creator.price / MIST_PER_SUI
+        : Number(creator.price) / MIST_PER_SUI,
+    contentCount: creator.contentCount,
+    supporterCount: creator.totalSupporters,
+    owner: creator.owner,
+  };
+}
+
+/** Indexer → UI: map IndexedContent to Content with blobId (for Creator Profile). */
+export function indexedContentToContent(
+  content: IndexedContent,
+  hasAccess: boolean,
+): Content & { blobId: string } {
+  return {
+    id: content.contentId,
+    creatorId: content.creatorProfileId,
+    title: content.title,
+    description: content.description || undefined,
+    type: (content.contentType as "image" | "text" | "pdf") || "image",
+    isLocked: !hasAccess,
+    createdAt: new Date(content.createdAt),
+    blobId: content.blobId,
   };
 }

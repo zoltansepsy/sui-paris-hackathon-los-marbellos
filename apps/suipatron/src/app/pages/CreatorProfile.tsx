@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useAuth } from "../lib/auth-context";
-import { useCreatorProfile, useContentList } from "../hooks/useCreator";
+import {
+  useCreatorProfile,
+  useContentList,
+  useIndexedCreator,
+} from "../hooks/useCreator";
 import { useHasAccess } from "../hooks/useAccessPass";
 import {
   creatorProfileToCreator,
@@ -17,20 +22,16 @@ import { Button } from "../components/ui/button";
 import { ContentCard } from "../components/ContentCard";
 import { SupportModal } from "../components/SupportModal";
 import { EncryptedContentViewer } from "../components/EncryptedContentViewer";
-import { mockCreators, mockContent } from "../lib/mock-data";
-import {
-  Users,
-  Lock,
-  CheckCircle2,
-  Settings,
-  ExternalLink,
-} from "lucide-react";
-import { WALRUS_AGGREGATOR_URL_TESTNET, type ContentType } from "../constants";
+import type { ContentType } from "../constants";
+import type { Content } from "@/shared/types/creator.types";
+import { Users, Lock, CheckCircle2, Settings } from "lucide-react";
 
 export function CreatorProfile() {
   const params = useParams();
   const id = params.id as string;
+  const account = useCurrentAccount();
   const { user, walletAddress } = useAuth();
+  const addressForAccess = account?.address ?? walletAddress ?? undefined;
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [viewerContent, setViewerContent] = useState<{
     blobId: string;
@@ -41,16 +42,47 @@ export function CreatorProfile() {
     description?: string;
   } | null>(null);
 
-  // On-chain queries
+  const { data: accessPass } = useHasAccess(addressForAccess, id);
+  const userHasAccess = !!accessPass;
+
+  const indexed = useIndexedCreator(id, userHasAccess);
   const { data: profile, isLoading: profileLoading } = useCreatorProfile(id);
   const { data: onchainContent } = useContentList(id);
-  const { data: accessPass } = useHasAccess(walletAddress ?? undefined, id);
 
-  // Adapt on-chain data to UI types, fall back to mock
-  const mockCreator = mockCreators.find((c) => c.id === id);
-  const creator = profile ? creatorProfileToCreator(profile) : mockCreator;
+  const creator = useMemo(() => {
+    if (indexed.isNotFound) {
+      return profile ? creatorProfileToCreator(profile) : undefined;
+    }
+    return indexed.creator;
+  }, [indexed.isNotFound, indexed.creator, profile]);
 
-  if (profileLoading) {
+  const isOwnProfile = Boolean(
+    creator &&
+    addressForAccess &&
+    (creator.owner === addressForAccess || profile?.owner === addressForAccess),
+  );
+
+  const creatorContent = useMemo((): Content[] => {
+    if (indexed.isNotFound) {
+      if (!creator) return [];
+      const hasAccess = userHasAccess || isOwnProfile;
+      return (onchainContent ?? []).map((c) =>
+        onchainContentToContent(c, creator.id, hasAccess),
+      );
+    }
+    return indexed.content;
+  }, [
+    indexed.isNotFound,
+    indexed.content,
+    creator,
+    onchainContent,
+    userHasAccess,
+    isOwnProfile,
+  ]);
+
+  const isLoading = indexed.isLoading || (indexed.isNotFound && profileLoading);
+
+  if (isLoading) {
     return <LoadingState />;
   }
 
@@ -66,22 +98,6 @@ export function CreatorProfile() {
       </div>
     );
   }
-
-  const userHasAccess = !!accessPass;
-  const isOwnProfile = walletAddress
-    ? profile?.owner === walletAddress
-    : user?.id === creator.id;
-
-  const creatorContent =
-    onchainContent && onchainContent.length > 0
-      ? onchainContent.map((c) =>
-          onchainContentToContent(
-            c,
-            creator.id,
-            userHasAccess || !!isOwnProfile,
-          ),
-        )
-      : mockContent.filter((c) => c.creatorId === creator.id);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -202,9 +218,6 @@ export function CreatorProfile() {
                   "blobId" in content
                     ? (content as { blobId: string }).blobId
                     : undefined;
-                const blobUrl = blobId
-                  ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
-                  : null;
 
                 return (
                   <div key={content.id} className="space-y-2">

@@ -3,8 +3,9 @@
 import { AlertCircle } from "lucide-react";
 
 /**
- * Shown when Enoki is not configured. No mock auth or mock support — production requires
- * NEXT_PUBLIC_ENOKI_PUBLIC_KEY and NEXT_PUBLIC_GOOGLE_CLIENT_ID (and Enoki Portal setup).
+ * Legacy: previously shown when Enoki was not configured (blocked the app).
+ * The app now uses wallet-only auth when Enoki is missing, so this screen is no longer
+ * rendered. Kept for reference or optional use (e.g. banner in settings).
  */
 export function EnokiRequiredScreen() {
   return (
@@ -15,8 +16,8 @@ export function EnokiRequiredScreen() {
         </div>
         <h1 className="text-xl font-semibold">Enoki not configured</h1>
         <p className="text-sm text-muted-foreground">
-          Sign-in and sponsored transactions require Enoki. Set these
-          environment variables (and configure Enoki Portal):
+          Optional: set these for &quot;Sign in with Google&quot; (Enoki
+          Portal). The app works with wallet-only when these are unset.
         </p>
         <ul className="text-left text-sm font-mono bg-muted/50 rounded p-4 space-y-1">
           <li>NEXT_PUBLIC_ENOKI_PUBLIC_KEY</li>

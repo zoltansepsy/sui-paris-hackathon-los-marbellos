@@ -4,6 +4,8 @@ export {
   useMyCreatorProfile,
   useMyCreatorCap,
   useContentList,
+  useIndexedCreators,
+  useIndexedCreator,
 } from "./useCreator";
 
 export { useMyAccessPasses, useHasAccess } from "./useAccessPass";

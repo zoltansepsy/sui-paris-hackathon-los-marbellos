@@ -2,8 +2,7 @@
  * Transaction Service — PTB builders for all SuiPatron entry functions.
  *
  * Each method returns a Transaction object. The caller is responsible
- * for signing and executing (via dapp-kit's useSignAndExecuteTransaction
- * or Enoki's sponsorAndExecuteTransaction).
+ * for signing and executing (via dapp-kit's useSignAndExecuteTransaction).
  *
  * Reference: local-context/app/services/jobService.ts (transaction builder pattern)
  */

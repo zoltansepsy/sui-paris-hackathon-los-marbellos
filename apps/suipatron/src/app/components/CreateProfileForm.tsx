@@ -1,22 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useAuth } from "../lib/auth-context";
-import { useSponsorTransaction } from "../lib/use-sponsor-transaction";
-import { buildCreateProfileTx } from "../lib/ptb";
+import { useSuiPatronTransactions } from "../hooks/useTransactions";
 import { getCreatedProfileFromTx } from "../lib/get-created-objects";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { ConnectButton } from "@mysten/dapp-kit";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
-const SUI_TO_MIST = BigInt(1000000000);
+const SUI_TO_MIST = 1e9;
 
 export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
+  const account = useCurrentAccount();
   const { user, updateUser } = useAuth();
-  const sponsorTx = useSponsorTransaction();
+  const { createProfile, isPending } = useSuiPatronTransactions();
   const [name, setName] = useState(user?.name || "");
   const [bio, setBio] = useState("");
   const [price, setPrice] = useState("5");
@@ -26,13 +28,9 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
     if (!user) return;
 
     try {
-      const priceMist = BigInt(
-        Math.round(parseFloat(price || "0") * Number(SUI_TO_MIST)),
-      );
-      const { digest } = await sponsorTx.execute({
-        buildTx: () => buildCreateProfileTx(name, bio, priceMist),
-        getSender: async () => user.id,
-      });
+      const priceMist = Math.round(parseFloat(price || "0") * SUI_TO_MIST);
+      const result = await createProfile(name, bio, priceMist);
+      const digest = result.digest;
 
       const created = await getCreatedProfileFromTx(digest);
       if (created) {
@@ -107,21 +105,25 @@ export function CreateProfileForm({ onSuccess }: { onSuccess: () => void }) {
           One-time payment for permanent access to all your content
         </p>
       </div>
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full"
-        disabled={sponsorTx.isLoading}
-      >
-        {sponsorTx.isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating...
-          </>
-        ) : (
-          "Create Creator Profile"
-        )}
-      </Button>
+      {!account ? (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Connect your wallet to create a creator profile.
+          </p>
+          <ConnectButton connectText="Connect Wallet" />
+        </div>
+      ) : (
+        <Button type="submit" size="lg" className="w-full" disabled={isPending}>
+          {isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            "Create Creator Profile"
+          )}
+        </Button>
+      )}
     </form>
   );
 }

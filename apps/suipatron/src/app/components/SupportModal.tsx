@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useAuth } from "../lib/auth-context";
+import { useAccessPasses } from "../lib/access-pass";
 import { useSuiPatronTransactions } from "../hooks/useTransactions";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +17,12 @@ import {
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
+import { ConnectButton } from "@mysten/dapp-kit";
 import type { Creator } from "@/shared/types/creator.types";
-import { MIST_PER_SUI } from "../constants";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
-const SUI_TO_MIST = BigInt(1000000000);
+const MIST_PER_SUI = 1e9;
 
 interface SupportModalProps {
   creator: Creator;
@@ -30,17 +31,15 @@ interface SupportModalProps {
   onSuccess?: () => void;
 }
 
-export function SupportModal({
-  creator,
-  open,
-  onOpenChange,
-  onSuccess,
-}: SupportModalProps) {
-  const { user, walletAddress } = useAuth();
-  const { purchaseAccess, isPending } = useSuiPatronTransactions();
-  const queryClient = useQueryClient();
+export function SupportModal(props: SupportModalProps) {
+  const { creator, open, onOpenChange, onSuccess } = props;
+  const account = useCurrentAccount();
+  const { user } = useAuth();
+  const addressForStorage = account?.address ?? user?.id;
+  const { addAccessPass } = useAccessPasses(addressForStorage);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const { purchaseAccess, isPending } = useSuiPatronTransactions();
 
   const handleSupport = async () => {
     if (!user) {
@@ -50,30 +49,21 @@ export function SupportModal({
     }
 
     setIsProcessing(true);
-
     try {
-      if (walletAddress) {
-        // Real on-chain transaction
-        await purchaseAccess(creator.id, creator.price * MIST_PER_SUI);
-        queryClient.invalidateQueries({ queryKey: ["hasAccess"] });
-        queryClient.invalidateQueries({ queryKey: ["myAccessPasses"] });
-      } else {
-        // Mock fallback for dev without wallet
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
-      setIsProcessing(false);
+      const priceMist = Math.round(creator.price * MIST_PER_SUI);
+      await purchaseAccess(creator.id, priceMist);
+      addAccessPass(creator.id);
       onOpenChange(false);
       toast.success("Access granted! You can now view all content.");
-
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (error) {
-      setIsProcessing(false);
+      onSuccess?.();
+    } catch (e) {
       toast.error(
-        error instanceof Error ? error.message : "Transaction failed",
+        e instanceof Error
+          ? e.message
+          : "Transaction failed. Please try again.",
       );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,16 +126,23 @@ export function SupportModal({
           >
             Cancel
           </Button>
-          <Button onClick={handleSupport} disabled={isProcessing || isPending}>
-            {isProcessing || isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Support for ${creator.price} SUI`
-            )}
-          </Button>
+          {!account ? (
+            <ConnectButton connectText="Connect Wallet to Support" />
+          ) : (
+            <Button
+              onClick={handleSupport}
+              disabled={isProcessing || isPending}
+            >
+              {isProcessing || isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Support for ${creator.price} SUI`
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

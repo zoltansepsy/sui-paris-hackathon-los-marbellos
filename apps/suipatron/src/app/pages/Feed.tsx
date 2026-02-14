@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useAuth } from "../lib/auth-context";
 import { useMyAccessPasses } from "../hooks/useAccessPass";
 import {
@@ -29,10 +30,11 @@ import type { Creator, Content } from "@/shared/types/creator.types";
 import { Heart } from "lucide-react";
 
 export function Feed() {
+  const account = useCurrentAccount();
   const { user, walletAddress } = useAuth();
-  const { data: onchainPasses, isLoading: passesLoading } = useMyAccessPasses(
-    walletAddress ?? undefined,
-  );
+  const addressForPasses = account?.address ?? walletAddress ?? undefined;
+  const { data: onchainPasses, isLoading: passesLoading } =
+    useMyAccessPasses(addressForPasses);
 
   useEffect(() => {
     window.scrollTo(0, 0);

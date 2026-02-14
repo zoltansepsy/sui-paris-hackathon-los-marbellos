@@ -1,27 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { CreatorCard } from "../components/CreatorCard";
 import { LoadingState } from "../components/LoadingState";
-import { useCreatorProfiles } from "../hooks/useCreator";
+import { useIndexedCreators, useCreatorProfiles } from "../hooks/useCreator";
 import { creatorProfileToCreator } from "../lib/adapters";
 import { Search, Users, RefreshCw } from "lucide-react";
 
+const PAGE_SIZE = 20;
+
 export function Explore() {
   const [searchQuery, setSearchQuery] = useState("");
-  const {
-    data: profiles,
-    isLoading,
-    refetch,
-    isFetching,
-  } = useCreatorProfiles();
+  const indexed = useIndexedCreators(PAGE_SIZE);
+  const onChain = useCreatorProfiles(50);
 
-  // Use ONLY on-chain data (no mock fallback)
-  const creators = profiles ? profiles.map(creatorProfileToCreator) : [];
+  const onChainCreators = useMemo(
+    () => (onChain.data ? onChain.data.map(creatorProfileToCreator) : []),
+    [onChain.data],
+  );
+
+  const creators = useMemo(
+    () => (indexed.creators.length > 0 ? indexed.creators : onChainCreators),
+    [indexed.creators, onChainCreators],
+  );
+
+  const refetch = () => {
+    indexed.refetch();
+    onChain.refetch();
+  };
+
+  const isLoading = indexed.isLoading;
+  const isFetching = indexed.isFetching || onChain.isFetching;
 
   const filteredCreators = creators.filter(
     (creator) =>

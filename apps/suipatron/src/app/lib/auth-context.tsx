@@ -5,12 +5,12 @@ import React, {
   useContext,
   useState,
   useEffect,
-  useRef,
   useCallback,
+  useMemo,
 } from "react";
-import { useCurrentAccount, useDisconnectWallet } from "@mysten/dapp-kit";
 import type { User } from "@/shared/types/user.types";
 import { EnokiFlowProvider, useEnokiFlow } from "@mysten/enoki/react";
+import { useCurrentAccount, useDisconnectWallet } from "@mysten/dapp-kit";
 import {
   isEnokiConfigured,
   enokiApiKey,
@@ -20,6 +20,7 @@ import {
 
 interface AuthContextType {
   user: User | null;
+  /** zkLogin address (Enoki). Use for on-chain queries. */
   walletAddress: string | null;
   isLoading: boolean;
   signIn: (emailOrRedirect?: string) => Promise<void>;
@@ -28,16 +29,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-type StorageAdapter = {
-  getItem: (k: string) => string | null;
-  setItem: (k: string, v: string) => void;
-  removeItem: (k: string) => void;
-};
-
-function truncateAddress(address: string): string {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 function userFromAddress(address: string): User {
   const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -92,13 +83,11 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
     setUser((u) => (u ? { ...u, ...updates } : null));
   }, []);
 
-  const walletAddress = user?.id ?? null;
-
   return (
     <AuthContext.Provider
       value={{
         user,
-        walletAddress,
+        walletAddress: user?.id ?? null,
         isLoading,
         signIn,
         signOut,
@@ -110,82 +99,42 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
-  const [mockUser, setMockUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const storageRef = useRef<StorageAdapter | null>(null);
+/**
+ * Wallet-only auth when Enoki is not configured.
+ * Derives user from dapp-kit useCurrentAccount(); no sponsor flow.
+ */
+function WalletAuthProviderInner({ children }: { children: React.ReactNode }) {
+  const account = useCurrentAccount();
+  const { mutate: disconnect } = useDisconnectWallet();
+  const [userOverrides, setUserOverrides] = useState<Partial<User>>({});
 
-  const currentAccount = useCurrentAccount();
-  const { mutate: disconnectWallet } = useDisconnectWallet();
+  const user = useMemo(() => {
+    const address = account?.address ?? null;
+    if (!address) return null;
+    const base = userFromAddress(address);
+    return { ...base, ...userOverrides };
+  }, [account?.address, userOverrides]);
 
-  const walletAddress = currentAccount?.address ?? null;
-
-  const user: User | null = walletAddress
-    ? {
-        name: truncateAddress(walletAddress),
-        email: "",
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${walletAddress}`,
-        isCreator: false,
-        ...mockUser,
-        id: walletAddress,
-      }
-    : mockUser;
-
-  useEffect(() => {
-    import("./storage").then(({ getAuthStorage }) => {
-      storageRef.current = getAuthStorage();
-      const stored = storageRef.current.getItem("suipatron_user");
-      if (stored) {
-        try {
-          setMockUser(JSON.parse(stored));
-        } catch {
-          /* ignore */
-        }
-      }
-      setIsLoading(false);
-    });
+  const signIn = useCallback(async () => {
+    // No-op: user connects wallet via dapp-kit ConnectButton / wallet UI
   }, []);
 
-  const signIn = async (email: string) => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    const newUser: User = {
-      id: `user_${Date.now()}`,
-      name: email.split("@")[0],
-      email,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-      isCreator: false,
-    };
+  const signOut = useCallback(() => {
+    disconnect();
+    setUserOverrides({});
+  }, [disconnect]);
 
-    setMockUser(newUser);
-    const storage =
-      storageRef.current ?? (await import("./storage")).getAuthStorage();
-    storage.setItem("suipatron_user", JSON.stringify(newUser));
-    setIsLoading(false);
-  };
-
-  const signOut = () => {
-    if (walletAddress) {
-      disconnectWallet();
-    }
-    setMockUser(null);
-    storageRef.current?.removeItem("suipatron_user");
-  };
-
-  const updateUser = (updates: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = { ...mockUser, ...updates };
-    setMockUser(updatedUser as User);
-    storageRef.current?.setItem("suipatron_user", JSON.stringify(updatedUser));
-  };
+  const updateUser = useCallback((updates: Partial<User>) => {
+    setUserOverrides((prev) => ({ ...prev, ...updates }));
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        walletAddress,
-        isLoading,
-        signIn: (e) => signIn(typeof e === "string" ? e : "demo@example.com"),
+        walletAddress: account?.address ?? null,
+        isLoading: false,
+        signIn,
         signOut,
         updateUser,
       }}
@@ -203,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       </EnokiFlowProvider>
     );
   }
-  return <MockAuthProviderInner>{children}</MockAuthProviderInner>;
+  return <WalletAuthProviderInner>{children}</WalletAuthProviderInner>;
 }
 
 export function useAuth() {

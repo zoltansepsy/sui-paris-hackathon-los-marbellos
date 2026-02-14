@@ -5,6 +5,8 @@
 
 **Production readiness:** Enoki is **required** — when `NEXT_PUBLIC_ENOKI_PUBLIC_KEY` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are not set, the app shows an "Enoki not configured" screen (no mock auth or mock support). Creator profile and content use **on-chain data only** (no mock creator/content fallbacks).
 
+**Indexer vs frontend:** Explore and Creator Profile pages use **on-chain data only** (creatorService events + RPC). `GET /api/creators` and `GET /api/creator/:id` read from the indexer store (populated by `GET /api/events` cron) and are **not currently called by the frontend**. The indexer is for future use (e.g. search, pagination) or external/cron consumers.
+
 ---
 
 ## Completed

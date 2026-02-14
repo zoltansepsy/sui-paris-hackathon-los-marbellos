@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SuiPatron is a decentralized Patreon-like creator support platform on SUI. Creators publish encrypted content, supporters pay a flat one-time price for permanent access to all of a creator's content. Content is encrypted with SEAL and stored on Walrus. All access control is on-chain via AccessPass NFTs. Transactions are sponsored via Enoki zkLogin (Google sign-in, no wallet needed). Multiple tiers are planned for Phase 2 — the MVP uses a single price per creator.
+SuiPatron is a decentralized Patreon-like creator support platform on SUI. Creators publish encrypted content, supporters pay a flat one-time price for permanent access to all of a creator's content. Content is encrypted with SEAL and stored on Walrus. All access control is on-chain via AccessPass NFTs. Chain transactions use wallet sign+execute (dapp-kit); Enoki is optional for "Sign in with Google" identity only. Multiple tiers are planned for Phase 2 — the MVP uses a single price per creator.
 
 The full specification lives in `docs/SCOPE.md`.
 
@@ -63,14 +63,14 @@ Key Move patterns used:
 
 ### Data Flows
 
-| Action          | Path                                                                                                     |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| Sign in         | Frontend → Google OAuth → Enoki → zkLogin address                                                        |
-| Create profile  | Frontend PTB → Enoki sponsors → SUI executes → CreatorProfile + CreatorCap created                       |
-| Upload content  | File → SEAL encrypt (client-side) → Walrus store → blobId recorded on-chain as Content dynamic field     |
-| Purchase access | Frontend PTB with flat payment → Enoki sponsors → SUI deposits to profile balance + mints AccessPass NFT |
-| View content    | Walrus download → SEAL decrypt (seal_approve validates AccessPass) → render                              |
-| Withdraw        | Frontend PTB → Enoki sponsors → balance transferred to creator                                           |
+| Action          | Path                                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| Sign in         | Connect wallet (dapp-kit) or, when Enoki configured, Google OAuth → Enoki → zkLogin address           |
+| Create profile  | Frontend PTB → Wallet sign+execute → SUI → CreatorProfile + CreatorCap created                        |
+| Upload content  | File → Walrus store → blobId recorded on-chain (wallet sign+execute) as Content dynamic field         |
+| Purchase access | Frontend PTB with flat payment → Wallet sign+execute → SUI deposits to profile + mints AccessPass NFT |
+| View content    | Walrus download → SEAL decrypt (seal_approve validates AccessPass) → render                           |
+| Withdraw        | Frontend PTB → Wallet sign+execute → balance transferred to creator                                   |
 
 ### SEAL Encryption Identity Format
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
 import { isEnokiConfigured } from "../lib/enoki-provider";
+import { ConnectButton } from "@mysten/dapp-kit";
 import { Button } from "../components/ui/button";
 import {
   Dialog,
@@ -90,18 +91,21 @@ export function Landing() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                size="lg"
-                className="text-lg px-8"
-                onClick={() =>
-                  isEnokiConfigured
-                    ? handleSignInWithGoogle()
-                    : setShowSignIn(true)
-                }
-              >
-                <Heart className="mr-2 h-5 w-5" />
-                Sign in with Google
-              </Button>
+              {isEnokiConfigured ? (
+                <Button
+                  size="lg"
+                  className="text-lg px-8"
+                  onClick={handleSignInWithGoogle}
+                >
+                  <Heart className="mr-2 h-5 w-5" />
+                  Sign in with Google
+                </Button>
+              ) : (
+                <ConnectButton
+                  connectText="Connect Wallet"
+                  className="!text-lg !px-8 !h-12"
+                />
+              )}
               <Button
                 size="lg"
                 variant="outline"

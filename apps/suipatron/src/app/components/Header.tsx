@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
+import { isEnokiConfigured } from "../lib/enoki-provider";
+import { ConnectButton } from "@mysten/dapp-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import {
@@ -174,10 +176,12 @@ export function Header() {
                 </SheetContent>
               </Sheet>
             </>
-          ) : (
+          ) : isEnokiConfigured ? (
             <Button onClick={() => signIn()} variant="default">
               Sign in
             </Button>
+          ) : (
+            <ConnectButton connectText="Connect Wallet" />
           )}
         </div>
       </div>

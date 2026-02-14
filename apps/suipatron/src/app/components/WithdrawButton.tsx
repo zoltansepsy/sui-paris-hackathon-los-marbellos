@@ -1,8 +1,8 @@
 "use client";
 
+import { useCurrentAccount } from "@mysten/dapp-kit";
 import { useAuth } from "../lib/auth-context";
-import { useSponsorTransaction } from "../lib/use-sponsor-transaction";
-import { buildWithdrawEarningsTx } from "../lib/ptb";
+import { useSuiPatronTransactions } from "../hooks/useTransactions";
 import { Button } from "../components/ui/button";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -24,8 +24,9 @@ export function WithdrawButton({
   size = "sm",
   className,
 }: WithdrawButtonProps) {
+  const account = useCurrentAccount();
   const { user, updateUser } = useAuth();
-  const sponsorTx = useSponsorTransaction();
+  const { withdrawEarnings, isPending } = useSuiPatronTransactions();
 
   const profileId = user?.creatorProfile?.profileId;
   const creatorCapId = user?.creatorProfile?.creatorCapId;
@@ -37,10 +38,7 @@ export function WithdrawButton({
     }
 
     try {
-      await sponsorTx.execute({
-        buildTx: () => buildWithdrawEarningsTx(profileId, creatorCapId),
-        getSender: async () => user.id,
-      });
+      await withdrawEarnings(profileId, creatorCapId);
       updateUser({
         creatorProfile: {
           ...user.creatorProfile,
@@ -67,9 +65,9 @@ export function WithdrawButton({
       size={size}
       className={className}
       onClick={handleWithdraw}
-      disabled={sponsorTx.isLoading}
+      disabled={!account || isPending}
     >
-      {sponsorTx.isLoading ? (
+      {isPending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Withdrawing...
