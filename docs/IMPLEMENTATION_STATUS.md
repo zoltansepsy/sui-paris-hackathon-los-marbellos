@@ -7,42 +7,84 @@
 
 ## Completed
 
-### Smart Contracts (A1–A8)
+### Smart Contracts — Phase 1 (A1–A8)
 
-All core Move contracts are implemented, built, and tested. **18/18 unit tests pass.**
+All Phase 1 core Move contracts implemented, built, tested, and deployed to testnet. **18/18 unit tests pass.**
+
+**Phase 1 deployment (testnet):**
+- Package ID: `0xf3a74f8992ff0304f55aa951f1340885e3aa0018c7118670fa6d6041216c923f`
+
+### Smart Contracts — Phase 2 (Tiers, Registry, Tips/Fees, Subscriptions)
+
+All Phase 2 features implemented on branch `zoltan/smart-contract-phase2`. **45/45 unit tests pass.**
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `packages/blockchain/contracts/Move.toml` | ~5 | Package manifest (edition 2024.beta) |
-| `packages/blockchain/contracts/sources/suipatron.move` | ~420 | Core module |
-| `packages/blockchain/contracts/sources/seal_policy.move` | ~53 | SEAL access control |
-| `packages/blockchain/contracts/tests/suipatron_tests.move` | ~400 | 18 unit tests across 8 categories |
+| `packages/blockchain/contracts/Move.toml` | ~17 | Package manifest (edition 2024.beta) |
+| `packages/blockchain/contracts/sources/suipatron.move` | ~765 | Core module — tiers, fees, tips, subscriptions |
+| `packages/blockchain/contracts/sources/seal_policy.move` | ~105 | SEAL access control — 40-byte identity, tier + expiry checks |
+| `packages/blockchain/contracts/sources/registry.move` | ~105 | Creator Registry — DF String→ID handle mapping |
+| `packages/blockchain/contracts/tests/suipatron_tests.move` | ~2050 | 45 unit tests across 13 categories |
 
 **Types implemented:**
-- `Platform` — shared singleton, created at package publish (OTW pattern)
+- `Platform` — shared singleton (OTW), now with `platform_fee_bps: u64` and `treasury: Balance<SUI>`
 - `AdminCap` — owned by deployer, for platform admin operations
-- `CreatorProfile` — shared object with flat access price, balance, content count
-- `Content` — stored as dynamic object field on CreatorProfile (keyed by `u64` index)
+- `Tier` — value type (`store, copy, drop`): `name`, `description`, `price`, `tier_level`, `duration_ms: Option<u64>` (None = permanent, Some = subscription)
+- `CreatorProfile` — shared object with `tiers: vector<Tier>` (replaces Phase 1 flat `price: u64`), balance, content count
+- `Content` — DOF on CreatorProfile, now with `min_tier_level: u64` for tier-gated access
 - `CreatorCap` — owned by creator, proves ownership of a specific CreatorProfile
-- `AccessPass` — owned NFT proving supporter paid for access
+- `AccessPass` — owned NFT with `tier_level: u64` and `expires_at: Option<u64>` (None = permanent, Some = subscription expiry)
+- `Registry` — shared singleton (in `registry.move`), DF-based `String → ID` handle mapping
 
 **Entry functions:**
-- `create_profile(platform, name, bio, price, clock, ctx)` — creates CreatorProfile (shared) + CreatorCap (owned)
-- `update_profile(profile, cap, name?, bio?, avatar_blob_id?, suins_name?, price?, clock)` — partial updates via Option params
-- `publish_content(profile, cap, title, description, blob_id, content_type, clock, ctx)` — creates Content as DOF
-- `purchase_access(platform, profile, payment, clock, ctx)` — validates payment >= price, deposits to balance, mints AccessPass
+- `create_profile(platform, name, bio, tier_name, tier_description, tier_price, tier_level, tier_duration_ms, clock, ctx)` — creates CreatorProfile with initial tier + CreatorCap
+- `update_profile(profile, cap, name?, bio?, avatar_blob_id?, suins_name?, clock)` — partial updates (price param removed; use `add_tier` for tiers)
+- `add_tier(profile, cap, name, description, price, tier_level, duration_ms, clock)` — add tier to profile (validates no duplicate tier_level)
+- `publish_content(profile, cap, title, description, blob_id, content_type, min_tier_level, clock, ctx)` — creates Content as DOF, gated to min_tier_level
+- `purchase_access(platform, profile, tier_index, payment, clock, ctx)` — validates payment >= tier.price, applies platform fee split, mints AccessPass with tier_level + expires_at
 - `withdraw_earnings(profile, cap, clock, ctx)` — transfers full balance to creator
+- `tip(platform, profile, payment, clock, ctx)` — one-time tip with platform fee split
+- `set_platform_fee(platform, admin_cap, fee_bps, clock)` — admin-only, set fee in basis points (max 10000)
+- `withdraw_platform_fees(platform, admin_cap, clock, ctx)` — admin-only, withdraw treasury
+- `renew_subscription(platform, profile, access_pass, payment, clock, ctx)` — mutates AccessPass in-place, extends expiry from max(current_expiry, now) + duration
 - `migrate(platform, admin_cap)` — version migration for upgrades
+- `register_handle(registry, profile, cap, handle, clock)` — register unique handle in Registry (in registry.move)
+- `lookup_handle(registry, handle): Option<ID>` — look up handle→profile ID (in registry.move)
 
-**Events:** ProfileCreated, ProfileUpdated, ContentPublished, AccessPurchased, EarningsWithdrawn
+**Events:**
+- `ProfileCreated` — `profile_id`, `owner`, `name`, `initial_tier_count`, `timestamp`
+- `ProfileUpdated` — `profile_id`, `name`, `timestamp`
+- `TierAdded` — `profile_id`, `tier_name`, `tier_level`, `price`, `is_subscription`, `timestamp`
+- `ContentPublished` — `content_id`, `profile_id`, `blob_id`, `content_type`, `min_tier_level`, `timestamp`
+- `AccessPurchased` — `access_pass_id`, `profile_id`, `supporter`, `amount`, `tier_level`, `expires_at`, `platform_fee`, `timestamp`
+- `EarningsWithdrawn` — `profile_id`, `amount`, `recipient`, `timestamp`
+- `TipReceived` — `profile_id`, `tipper`, `total_amount`, `creator_amount`, `platform_fee`, `timestamp`
+- `PlatformFeeUpdated` — `old_fee_bps`, `new_fee_bps`, `timestamp`
+- `PlatformFeesWithdrawn` — `amount`, `recipient`, `timestamp`
+- `SubscriptionRenewed` — `access_pass_id`, `profile_id`, `supporter`, `new_expires_at`, `amount_paid`, `timestamp`
+- `HandleRegistered` — `registry_id`, `handle`, `profile_id`, `timestamp` (in registry.move)
 
-**SEAL policy:**
-- `seal_approve(id, access_pass, ctx)` — entry function called by SEAL key servers
-- `check_seal_access(id, access_pass, caller)` — public validation logic (testable)
+**SEAL policy (Phase 2 — 40-byte identity):**
+- `seal_approve(id, access_pass, clock, ctx)` — entry function called by SEAL key servers (Clock added in Phase 2)
+- `check_seal_access(id, access_pass, caller, clock)` — validates: (1) 40-byte identity, (2) caller == supporter, (3) creator ID matches, (4) tier_level >= min_tier_level, (5) subscription not expired
+- Identity format: `[CreatorProfile ID (32 bytes)][min_tier_level (8 bytes LE u64)]`
 
-**Move patterns demonstrated:** One-Time Witness, Capability, Shared Objects, Dynamic Object Fields, Events, Version Tracking, Balance/Coin handling
+**Move patterns demonstrated:** One-Time Witness, Capability, Shared Objects, Dynamic Object Fields, Dynamic Fields, Events, Version Tracking, Balance/Coin handling, Coin Splitting (fee BPS), Subscription Expiry (Clock), Value Types (Tier)
 
-**Test categories:** init, profile creation, profile update, content publishing, access purchase, withdrawal, SEAL policy, full end-to-end flow
+**Test categories (45 tests across 13 categories):**
+1. Initialization (1)
+2. Profile Creation (3)
+3. Profile Update (2)
+4. Add Tier (4)
+5. Content Publishing (3)
+6. Access Purchase with Tiers (5)
+7. Withdrawal (3)
+8. Platform Fees (4)
+9. Tips (3)
+10. Subscription Renewal (4)
+11. SEAL Policy v2 (7)
+12. Registry (4)
+13. Full Flow E2E (2)
 
 ### Documentation
 
@@ -59,9 +101,9 @@ All core Move contracts are implemented, built, and tested. **18/18 unit tests p
 
 ## Remaining — MVP Tasks
 
-### 1. Contract Deployment (A9)
+### 1. Contract Deployment — Phase 2 (A9)
 
-Deploy the Move package to SUI Testnet and record object IDs.
+Redeploy the Phase 2 Move package to SUI Testnet and record new object IDs.
 
 ```bash
 cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
@@ -70,6 +112,7 @@ cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
 After publishing, record:
 - [ ] Package ID → `NEXT_PUBLIC_PACKAGE_ID` (or `VITE_PACKAGE_ID`) in `apps/suipatron/.env`
 - [ ] Platform object ID → `NEXT_PUBLIC_PLATFORM_ID` (or `VITE_PLATFORM_ID`) in `apps/suipatron/.env`
+- [ ] Registry object ID → new env var or constant
 - [ ] AdminCap object ID (keep safe, not in env)
 - [ ] Update Enoki Portal with new Package ID in allowed move call targets
 - [ ] Smoke test via CLI: `sui client call --package {PKG} --module suipatron --function create_profile ...`
@@ -101,16 +144,20 @@ After publishing, record:
 
 ### 5. Integration Hooks / Services (P3–P14)
 
-PTB builders (transaction construction):
-- [x] `buildCreateProfileTx(name, bio, price)` — creates CreatorProfile + CreatorCap — **apps/suipatron**: `src/app/lib/ptb/index.ts`
-- [x] `buildUpdateProfileTx(profileId, creatorCapId, updates)` — updates profile metadata
-- [x] `buildPublishContentTx(profileId, creatorCapId, title, desc, blobId, contentType)` — publishes content
-- [x] `buildPurchaseAccessTx(profileId, price)` — purchases access + mints AccessPass
-- [x] `buildWithdrawEarningsTx(profileId, creatorCapId)` — withdraws creator earnings
+PTB builders (transaction construction) — **Updated for Phase 2 API:**
+- [ ] `buildCreateProfileTx(name, bio, tierName, tierDesc, tierPrice, tierLevel, tierDurationMs)` — creates CreatorProfile + CreatorCap
+- [ ] `buildUpdateProfileTx(profileId, updates)` — updates profile metadata (no price param)
+- [ ] `buildAddTierTx(profileId, name, desc, price, tierLevel, durationMs)` — adds tier to profile
+- [ ] `buildPublishContentTx(profileId, title, desc, blobId, contentType, minTierLevel)` — publishes content with tier gating
+- [ ] `buildPurchaseAccessTx(platformId, profileId, tierIndex, price)` — purchases access at specific tier
+- [ ] `buildWithdrawTx(profileId)` — withdraws creator earnings
+- [ ] `buildTipTx(platformId, profileId, amount)` — sends one-time tip
+- [ ] `buildRenewSubscriptionTx(platformId, profileId, accessPassId, price)` — renews subscription
+- [ ] `buildRegisterHandleTx(registryId, profileId, handle)` — registers creator handle
 
-SEAL integration:
-- [ ] `encryptContent(data, creatorProfileId, packageId)` — SEAL encrypt with creator's identity
-- [ ] `decryptContent(encryptedData, accessPass, sessionKey)` — SEAL decrypt via seal_approve
+SEAL integration — **Updated for Phase 2 identity format:**
+- [ ] `encryptContent(data, creatorProfileId, minTierLevel, packageId)` — SEAL encrypt with 40-byte identity (32-byte ID + 8-byte LE tier level)
+- [ ] `decryptContent(encryptedData, accessPass, sessionKey)` — SEAL decrypt via seal_approve (now requires Clock 0x6)
 
 Walrus integration:
 - [ ] `uploadToWalrus(encryptedData)` — store blob, return blobId
@@ -128,13 +175,15 @@ React hooks:
 
 ### 6. UI Pages (J5–J13)
 
-- [ ] Creator Profile page (`/creator/:id`) — header, price, content grid, "Support" button
-- [ ] Support/payment confirmation modal
-- [ ] Creator Dashboard (`/dashboard`) — profile editor, price setting, content list
-- [ ] Content uploader — file picker, title, description, encrypt + upload flow
+- [ ] Creator Profile page (`/creator/:id`) — header, tier list, content grid, "Support" button
+- [ ] Tier selection + payment confirmation modal
+- [ ] Creator Dashboard (`/dashboard`) — profile editor, tier management, content list
+- [ ] Content uploader — file picker, title, description, min tier level, encrypt + upload flow
 - [ ] Content viewer — renderers for image, text/markdown, PDF
 - [ ] Supporter Feed (`/feed`) — list of supported creators, content feed
 - [ ] Earnings panel — balance display, "Withdraw" button
+- [ ] Tip button on creator profiles
+- [ ] Subscription renewal flow for expiring AccessPasses
 - [ ] Loading states, skeleton screens
 - [ ] Error toasts, empty states with CTAs
 
@@ -149,7 +198,7 @@ React hooks:
 
 - [ ] Integration test: sign in → create profile → upload content
 - [ ] Integration test: browse → purchase access → decrypt content
-- [ ] Seed demo data: 3 creators, realistic prices, 5+ content items
+- [ ] Seed demo data: 3 creators, realistic prices/tiers, 5+ content items
 - [ ] Write and practice 3-minute demo script (see SCOPE.md Section 14)
 - [ ] Record backup video of successful demo flow
 - [ ] Configure Vercel deployment (auto-deploy from main)
@@ -166,19 +215,28 @@ These were discovered during smart contract implementation. Keep adding to this 
 - **`#[expected_failure]`**: When testing aborts from a different module (e.g., testing `suipatron::suipatron::EUnauthorized` from the test module), use plain `#[expected_failure]` without `abort_code`. Module-qualified paths in `abort_code` are not supported, and using a local constant with the same value causes a module-origin mismatch.
 - **`take_shared_by_id`**: When multiple shared objects of the same type exist in a test scenario, `take_shared<T>` may grab the wrong one. Use `take_shared_by_id<T>(&scenario, object_id)` for deterministic selection.
 - **Literal types**: Use typed literals like `3u64` instead of bare `3` to avoid warnings.
+- **`#[allow(unused_const)]`**: Use on error codes that are defined for documentation but not directly referenced in the module (e.g., `ENoTiers`, `EAccessPassExpired` which are asserted via other patterns).
+- **Unused params**: Prefix with `_` (e.g., `_ctx: &mut TxContext`) for parameters required by entry function signatures but not used in the body.
 
 ### SEAL Encryption
 
-- **Identity format (MVP)**: 32 bytes = CreatorProfile object ID bytes. All content for a creator shares the same identity.
+- **Identity format (Phase 2 — tiered)**: 40 bytes = `[CreatorProfile ID (32 bytes)][min_tier_level (8 bytes, little-endian u64)]`. Content at different tier levels uses different SEAL identities.
+- **Identity format (Phase 1 — flat)**: 32 bytes = CreatorProfile object ID bytes. All content for a creator shares the same identity.
+- **Clock in `seal_approve`**: Phase 2 adds `&Clock` (object `0x6`) to `seal_approve` for subscription expiry validation. SEAL key servers must include Clock in their PTB.
 - **`packageId` for SEAL SDK**: Must be hex-encoded WITHOUT the `0x` prefix (check SDK docs).
 - **Threshold**: Set to 2 (at least 2 key servers must agree).
 - **Session keys**: Cached per-user per-package. First decrypt requires wallet signature; subsequent ones reuse the session.
 
 ### Architecture Decisions
 
-- **Flat one-time payment**: No expiry, no tiers, no renewal logic. Simplest possible MVP. Tiers planned for Phase 2.
+- **Phase 2 tiers**: `vector<Tier>` on CreatorProfile (not Table/DF) — small cardinality, simpler, copy+drop compatible.
+- **`tier_index` for purchase**: `purchase_access` takes `tier_index: u64` (vector index) rather than `tier_level` to avoid linear scan. `renew_subscription` uses `find_tier_by_level` since it needs to match by level.
+- **Subscription renewal**: Mutates AccessPass in-place (preserves object ID for off-chain references). Extends from `max(current_expiry, now)` to handle both pre-expiry and post-expiry renewals.
+- **Platform fee**: Basis points (BPS), default 0. Applied to `purchase_access`, `tip`, and `renew_subscription`. Uses shared `calculate_fee_split(amount, fee_bps)` helper.
+- **Registry**: Separate module with its own `init`. Uses Dynamic Fields (DF, not DOF) for String→ID mapping. Lightweight — no Balance or complex state.
 - **Content keyed by `u64` index**: `profile.content_count` used as auto-incrementing key for DOF. Simple but means content cannot be deleted/reordered without gaps.
 - **AccessPass stores `supporter: address`**: Used by `seal_approve` to verify the caller owns the pass. Important for SEAL validation.
+- **VERSION bumped to 2**: All structs (Platform, CreatorProfile, Registry) and entry functions check `version == VERSION`.
 
 ---
 
@@ -193,7 +251,11 @@ suipatron::suipatron::create_profile(
     platform: &mut Platform,        // shared object — VITE_PLATFORM_ID
     name: String,
     bio: String,
-    price: u64,                     // in MIST (1 SUI = 1_000_000_000)
+    tier_name: String,              // Initial tier name
+    tier_description: String,       // Initial tier description
+    tier_price: u64,                // Initial tier price in MIST
+    tier_level: u64,                // Must be > 0. Higher = more access
+    tier_duration_ms: Option<u64>,  // None = permanent, Some = subscription period
     clock: &Clock,                  // 0x6
     ctx: &mut TxContext,
 )
@@ -207,10 +269,21 @@ suipatron::suipatron::update_profile(
     bio: Option<String>,
     avatar_blob_id: Option<String>,
     suins_name: Option<String>,
-    price: Option<u64>,
     clock: &Clock,
 )
 // Emits: ProfileUpdated
+
+suipatron::suipatron::add_tier(
+    profile: &mut CreatorProfile,
+    cap: &CreatorCap,
+    name: String,
+    description: String,
+    price: u64,                     // in MIST
+    tier_level: u64,                // Must be > 0, must not duplicate existing level
+    duration_ms: Option<u64>,       // None = permanent, Some = subscription period
+    clock: &Clock,
+)
+// Emits: TierAdded
 
 suipatron::suipatron::publish_content(
     profile: &mut CreatorProfile,
@@ -219,6 +292,7 @@ suipatron::suipatron::publish_content(
     description: String,
     blob_id: String,                // Walrus blob ID (encrypted content)
     content_type: String,           // "image", "text", "pdf"
+    min_tier_level: u64,            // Minimum tier level to decrypt this content
     clock: &Clock,
     ctx: &mut TxContext,
 )
@@ -227,11 +301,12 @@ suipatron::suipatron::publish_content(
 suipatron::suipatron::purchase_access(
     platform: &mut Platform,
     profile: &mut CreatorProfile,
-    payment: Coin<SUI>,             // must be >= profile.price
+    tier_index: u64,                // Index into profile.tiers vector
+    payment: Coin<SUI>,             // must be >= tier.price
     clock: &Clock,
     ctx: &mut TxContext,
 )
-// Creates: AccessPass (transferred to sender)
+// Creates: AccessPass (transferred to sender) with tier_level and optional expires_at
 // Emits: AccessPurchased
 
 suipatron::suipatron::withdraw_earnings(
@@ -243,9 +318,58 @@ suipatron::suipatron::withdraw_earnings(
 // Transfers: full balance to profile.owner
 // Emits: EarningsWithdrawn
 
+suipatron::suipatron::tip(
+    platform: &mut Platform,
+    profile: &mut CreatorProfile,
+    payment: Coin<SUI>,             // must be > 0
+    clock: &Clock,
+    ctx: &mut TxContext,
+)
+// Deposits: tip amount (minus platform fee) to profile.balance
+// Emits: TipReceived
+
+suipatron::suipatron::set_platform_fee(
+    platform: &mut Platform,
+    cap: &AdminCap,
+    fee_bps: u64,                   // 0-10000 (basis points, 250 = 2.5%)
+    clock: &Clock,
+)
+// Admin only
+// Emits: PlatformFeeUpdated
+
+suipatron::suipatron::withdraw_platform_fees(
+    platform: &mut Platform,
+    cap: &AdminCap,
+    clock: &Clock,
+    ctx: &mut TxContext,
+)
+// Admin only — transfers treasury to platform.admin
+// Emits: PlatformFeesWithdrawn
+
+suipatron::suipatron::renew_subscription(
+    platform: &mut Platform,
+    profile: &mut CreatorProfile,
+    access_pass: &mut AccessPass,   // Must be a subscription (expires_at is Some)
+    payment: Coin<SUI>,             // must be >= tier.price
+    clock: &Clock,
+    ctx: &mut TxContext,
+)
+// Mutates: access_pass.expires_at extended by tier.duration_ms
+// Emits: SubscriptionRenewed
+
+suipatron::registry::register_handle(
+    registry: &mut Registry,
+    profile: &CreatorProfile,
+    cap: &CreatorCap,
+    handle: String,                 // Unique handle
+    clock: &Clock,
+)
+// Emits: HandleRegistered
+
 suipatron::seal_policy::seal_approve(
-    id: vector<u8>,                 // SEAL identity (32 bytes = CreatorProfile ID)
+    id: vector<u8>,                 // SEAL identity (40 bytes = 32-byte CreatorProfile ID + 8-byte LE min_tier_level)
     access_pass: &AccessPass,       // supporter's AccessPass NFT
+    clock: &Clock,                  // 0x6 — for subscription expiry check
     ctx: &TxContext,
 )
 // Used by SEAL key servers — not called directly by frontend
@@ -254,31 +378,67 @@ suipatron::seal_policy::seal_approve(
 ### Getter Functions (for on-chain reads)
 
 ```
-profile_price(profile) → u64
+// AccessPass
+access_pass_creator_profile_id(pass) → ID
+access_pass_supporter(pass) → address
+access_pass_purchased_at(pass) → u64
+access_pass_amount_paid(pass) → u64
+access_pass_tier_level(pass) → u64
+access_pass_expires_at(pass) → Option<u64>
+
+// CreatorProfile
 profile_owner(profile) → address
 profile_content_count(profile) → u64
 profile_total_supporters(profile) → u64
 profile_balance(profile) → u64
 profile_name(profile) → String
+profile_tiers(profile) → &vector<Tier>
+profile_tier_count(profile) → u64
+
+// Platform
 platform_total_creators(platform) → u64
 platform_total_access_passes(platform) → u64
-access_pass_creator_profile_id(pass) → ID
-access_pass_supporter(pass) → address
-access_pass_purchased_at(pass) → u64
-access_pass_amount_paid(pass) → u64
+platform_fee_bps(platform) → u64
+platform_treasury_balance(platform) → u64
+
+// Tier (value type)
+tier_name(tier) → String
+tier_description(tier) → String
+tier_price(tier) → u64
+tier_level(tier) → u64
+tier_duration_ms(tier) → Option<u64>
+
+// CreatorCap
 cap_profile_id(cap) → ID
+
+// Registry
+registry_total_handles(registry) → u64
+lookup_handle(registry, handle) → Option<ID>
 ```
 
 ### Error Codes
 
-| Code | Name | Meaning |
-|------|------|---------|
-| 0 | `ENoAccess` (seal_policy) | SEAL validation failed |
-| 1 | `EUnauthorized` | CreatorCap doesn't match profile |
-| 2 | `EInsufficientPayment` | Payment < profile.price |
-| 3 | `EVersionMismatch` | Object version != current VERSION |
-| 4 | `EAlreadyMigrated` | Platform already at current version |
-| 7 | `EZeroBalance` | Withdraw attempted with zero balance |
+| Code | Name | Module | Meaning |
+|------|------|--------|---------|
+| 0 | `ENoAccess` | seal_policy | SEAL validation failed |
+| 1 | `EUnauthorized` | suipatron | CreatorCap doesn't match profile |
+| 2 | `EInsufficientPayment` | suipatron | Payment < tier.price |
+| 3 | `EVersionMismatch` | suipatron | Object version != current VERSION |
+| 4 | `EAlreadyMigrated` | suipatron | Platform already at current version |
+| 5 | `ENotSubscriber` | suipatron | AccessPass is not a subscription (no expires_at) |
+| 6 | `EWrongCreator` | suipatron | AccessPass creator_profile_id doesn't match profile |
+| 7 | `EZeroBalance` | suipatron | Withdraw attempted with zero balance |
+| 8 | `ENoTiers` | suipatron | (reserved) Profile has no tiers |
+| 9 | `ETierIndexOutOfBounds` | suipatron | Tier index >= tiers vector length |
+| 10 | `EDuplicateTierLevel` | suipatron | Tier level already exists on profile |
+| 11 | `EZeroTip` | suipatron | Tip amount is zero |
+| 12 | `EInvalidFeeBps` | suipatron | Fee basis points > 10000 |
+| 14 | `EAccessPassExpired` | suipatron | (reserved) Subscription has expired |
+| 15 | `EInvalidTierLevel` | suipatron | Tier level must be > 0 |
+| 100 | `EHandleAlreadyTaken` | registry | Handle string already registered |
+| 101 | `EHandleNotFound` | registry | (reserved) Handle not in registry |
+| 102 | `EUnauthorized` | registry | CreatorCap doesn't match profile |
+| 103 | `EVersionMismatch` | registry | Registry version mismatch |
 
 ---
 
@@ -291,9 +451,9 @@ See `CLAUDE.md` for full environment variable reference. Quick start:
 cd packages/blockchain/contracts && sui move build && sui move test
 
 # 2. Deploy to testnet (when ready)
-sui client publish --gas-budget 200000000
+cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
 
-# 3. Record Package ID and Platform ID from publish output
+# 3. Record Package ID, Platform ID, and Registry ID from publish output
 
 # 4. Set up frontend (monorepo)
 pnpm install
@@ -312,9 +472,9 @@ cd apps/suipatron && pnpm dev
 | `docs/00-README.md` | Documentation hub and navigation |
 | `docs/suipatron/01-product-breakdown-and-roadmap.md` | PBS with task status ([x]/[ ]) |
 | `docs/PRPs/README.md` | PRD → Plan → Implement workflow for features |
-| `docs/architecture/PTB-SPECIFICATION.md` | PTB builders (create_profile, purchase_access, withdraw) |
+| `docs/architecture/PTB-SPECIFICATION.md` | PTB builders for create_profile, purchase_access, withdraw |
 | `CLAUDE.md` | Project context, build commands, architecture summary |
 
 ---
 
-*Last updated: Smart contracts completed (18/18 tests pass). Frontend, backend, and integrations are next.*
+*Last updated: Phase 2 smart contracts completed (45/45 tests pass) on branch `zoltan/smart-contract-phase2`. Needs testnet deployment. Frontend, backend, and integrations are next.*
