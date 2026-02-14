@@ -24,6 +24,7 @@ SuiPatron is a decentralized Patreon-like platform where creators publish exclus
 |----------|---------|
 | [SCOPE.md](SCOPE.md) | Full project specification (single source of truth) |
 | [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) | Developer handover — what's done, what remains |
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full project audit — where we stand (snapshot) |
 | [reference/QUICK-START-CHECKLIST.md](reference/QUICK-START-CHECKLIST.md) | Setup and first tasks |
 | [reference/DOCUMENTATION-INDEX.md](reference/DOCUMENTATION-INDEX.md) | Complete document index |
 | [PRPs/README.md](PRPs/README.md) | PRD → Plan → Implement workflow |
