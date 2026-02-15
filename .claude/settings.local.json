@@ -22,7 +22,8 @@
       "Bash(pnpm update:*)",
       "Bash(vercel inspect:*)",
       "Bash(npx vercel inspect:*)",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "Bash(sui client publish:*)"
     ]
   }
 }
