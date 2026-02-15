@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import { isEnokiConfigured } from "../lib/enoki-provider";
+import { CreateProfileForm } from "../components/CreateProfileForm";
+import { WithdrawButton } from "../components/WithdrawButton";
 import {
   useMyCreatorProfile,
   useMyCreatorCap,
@@ -10,8 +13,6 @@ import {
 } from "../hooks/useCreator";
 import { useSuiPatronTransactions } from "../hooks/useTransactions";
 import {
-  useContentUpload,
-  useContentUploadUnencrypted,
   useContentUploadBundled,
 } from "../hooks/useContent";
 import { onchainContentToContent } from "../lib/adapters";
@@ -68,9 +69,7 @@ export function Dashboard() {
   const { data: myCreatorCap } = useMyCreatorCap(walletAddress ?? undefined);
   const { data: onchainContent } = useContentList(myProfile?.objectId);
   const {
-    createProfile,
     updateProfile,
-    withdrawEarnings,
     isPending: txPending,
   } = useSuiPatronTransactions();
   // Using BUNDLED upload for better UX (2 signatures instead of 3)
@@ -84,11 +83,7 @@ export function Dashboard() {
   const [bio, setBio] = useState(
     myProfile?.bio || user?.creatorProfile?.bio || "",
   );
-  const [price, setPrice] = useState(
-    myProfile
-      ? (myProfile.price / MIST_PER_SUI).toString()
-      : user?.creatorProfile?.price?.toString() || "5",
-  );
+  const tiers = user?.creatorProfile?.tiers ?? [];
   const [suinsInput, setSuinsInput] = useState("");
 
   // Upload form states
@@ -130,33 +125,28 @@ export function Dashboard() {
   );
 
   // Event handlers
-  const handleBecomeCreator = useCallback(async () => {
-    if (!user) {
-      toast.error("Please sign in first");
-      return;
-    }
-    if (!walletAddress) {
-      toast.error("Please connect your wallet to become a creator");
-      return;
-    }
-
-    try {
-      const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
-      await createProfile(name || user.name, bio, priceInMist);
-
-      // Invalidate all creator-related queries so they refetch
-      queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["myCreatorCap"] });
-      queryClient.invalidateQueries({ queryKey: ["creatorProfiles"] }); // ✅ Added: Updates Explore page
-
-      toast.success("Creator profile created on-chain!");
-      setIsEditing(true);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create profile",
-      );
-    }
-  }, [walletAddress, price, name, user, bio, createProfile, queryClient]);
+  const handleBecomeCreator = useCallback(() => {
+    updateUser({
+      isCreator: true,
+      creatorProfile: {
+        bio: "",
+        tiers: [
+          {
+            name: "Supporter",
+            description: "Access to all content",
+            price: 5,
+            tierLevel: 1,
+            durationMs: null,
+          },
+        ],
+        balance: 0,
+        contentCount: 0,
+        supporterCount: 0,
+      },
+    });
+    setIsEditing(true);
+    toast.success("Welcome! Set up your creator profile.");
+  }, [updateUser]);
 
   const handleSaveProfile = useCallback(async () => {
     if (!user) {
@@ -168,11 +158,9 @@ export function Dashboard() {
 
     try {
       if (walletAddress && myProfile && myCreatorCap) {
-        const priceInMist = (parseFloat(price) || 5) * MIST_PER_SUI;
         await updateProfile(myProfile.objectId, myCreatorCap.objectId, {
           name,
           bio,
-          price: priceInMist,
         });
         queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
         toast.success("Profile updated on-chain!");
@@ -183,7 +171,6 @@ export function Dashboard() {
           creatorProfile: {
             ...user.creatorProfile,
             bio,
-            price: parseFloat(price) || 5,
           },
         });
         toast.success("Profile updated successfully");
@@ -196,7 +183,7 @@ export function Dashboard() {
 
     setIsSaving(false);
     setIsEditing(false);
-  }, [user, walletAddress, myProfile, myCreatorCap, price, name, bio, updateProfile, queryClient, updateUser]);
+  }, [user, walletAddress, myProfile, myCreatorCap, name, bio, updateProfile, queryClient, updateUser]);
 
   const handleClaimSuiNS = useCallback(async () => {
     if (!suinsInput.trim()) return;
@@ -322,9 +309,17 @@ export function Dashboard() {
               </div>
             </div>
 
-            <Button onClick={handleBecomeCreator} size="lg" className="w-full">
-              Set Up Creator Profile
-            </Button>
+            {isEnokiConfigured ? (
+              <CreateProfileForm onSuccess={() => {}} />
+            ) : (
+              <Button
+                onClick={handleBecomeCreator}
+                size="lg"
+                className="w-full"
+              >
+                Set Up Creator Profile
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -353,43 +348,17 @@ export function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{displayBalance} SUI</div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  disabled={txPending || displayBalance === 0}
-                  onClick={async () => {
-                    if (walletAddress && myProfile && myCreatorCap) {
-                      try {
-                        await withdrawEarnings(
-                          myProfile.objectId,
-                          myCreatorCap.objectId,
-                        );
-                        queryClient.invalidateQueries({
-                          queryKey: ["myCreatorProfile"],
-                        });
-                        toast.success("Earnings withdrawn!");
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Withdrawal failed",
-                        );
-                      }
-                    } else {
-                      toast.error("Connect wallet to withdraw");
-                    }
-                  }}
-                >
-                  {txPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Withdrawing...
-                    </>
-                  ) : (
-                    "Withdraw"
-                  )}
-                </Button>
+                {isEnokiConfigured ? (
+                  <WithdrawButton
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                  />
+                ) : (
+                  <Button variant="outline" size="sm" className="mt-3" disabled>
+                    Withdraw
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -492,21 +461,39 @@ export function Dashboard() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="price">Support Price (SUI)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    disabled={!isEditing}
-                    min="0"
-                    step="0.1"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    One-time payment for permanent access to all your content
-                  </p>
-                </div>
+                {tiers.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Tiers</Label>
+                    <div className="space-y-2">
+                      {tiers.map((tier, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">{tier.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {tier.description}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-sm">
+                              {tier.price} SUI
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {tier.durationMs
+                                ? `${Math.round(tier.durationMs / 86400000)}d`
+                                : "Permanent"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Manage tiers from your creator dashboard
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

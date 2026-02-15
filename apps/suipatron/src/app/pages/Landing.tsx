@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import { isEnokiConfigured } from "../lib/enoki-provider";
 import { Button } from "../components/ui/button";
 import {
   Dialog,
@@ -26,9 +27,13 @@ export function Landing() {
 
   useEffect(() => {
     if (searchParams.get("signin") === "true") {
-      setShowSignIn(true);
+      if (isEnokiConfigured) {
+        signIn();
+      } else {
+        setShowSignIn(true);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, signIn]);
 
   useEffect(() => {
     if (user && showSignIn) {
@@ -37,7 +42,11 @@ export function Landing() {
     }
   }, [user, showSignIn, router]);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignInWithGoogle = () => {
+    signIn();
+  };
+
+  const handleSignInWithEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
@@ -76,15 +85,20 @@ export function Landing() {
             </h1>
 
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              One-time payment. Permanent access. No monthly fees. No platform
-              fees. Content owned by creators, accessible to supporters forever.
+              Flexible access — pay once for permanent access, or subscribe at
+              your own pace. No platform fees. Content owned by creators,
+              powered by SUI.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
                 size="lg"
                 className="text-lg px-8"
-                onClick={() => setShowSignIn(true)}
+                onClick={() =>
+                  isEnokiConfigured
+                    ? handleSignInWithGoogle()
+                    : setShowSignIn(true)
+                }
               >
                 <Heart className="mr-2 h-5 w-5" />
                 Sign in with Google
@@ -178,11 +192,11 @@ export function Landing() {
                 <CheckCircle2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-semibold text-lg mb-2">
-                    Permanent Access
+                    Flexible Access
                   </h3>
                   <p className="text-muted-foreground">
-                    Pay once, own forever. No recurring subscriptions or
-                    surprise charges.
+                    Choose permanent one-time access or affordable subscription
+                    tiers. Always transparent pricing.
                   </p>
                 </div>
               </div>
@@ -264,32 +278,49 @@ export function Landing() {
           <DialogHeader>
             <DialogTitle>Sign in to SuiPatron</DialogTitle>
             <DialogDescription>
-              Use your Google account to get started. No wallet setup required.
+              {isEnokiConfigured
+                ? "Use your Google account to get started. No wallet setup required."
+                : "Enter your email to sign in (demo mode)."}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSignIn} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+          {isEnokiConfigured ? (
+            <div className="space-y-4 py-4">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => {
+                  setShowSignIn(false);
+                  handleSignInWithGoogle();
+                }}
+              >
+                Sign in with Google
+              </Button>
             </div>
+          ) : (
+            <form onSubmit={handleSignInWithEmail} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your.email@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in with Google"}
-            </Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign in"}
+              </Button>
 
-            <p className="text-xs text-center text-muted-foreground">
-              By signing in, you agree to our Terms of Service and Privacy
-              Policy
-            </p>
-          </form>
+              <p className="text-xs text-center text-muted-foreground">
+                By signing in, you agree to our Terms of Service and Privacy
+                Policy
+              </p>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

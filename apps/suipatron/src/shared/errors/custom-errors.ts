@@ -10,6 +10,13 @@ export class CreatorNotFoundError extends Error {
   }
 }
 
+export class HandleNotFoundError extends Error {
+  constructor(handle: string) {
+    super(`Handle not found: ${handle}`);
+    this.name = "HandleNotFoundError";
+  }
+}
+
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);

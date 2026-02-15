@@ -9,8 +9,10 @@ import {
   FileText,
   BookOpen,
   Loader2,
+  Clock,
 } from "lucide-react";
 import type { Content } from "@/shared/types/creator.types";
+import type { SubscriptionStatus } from "../lib/subscription-utils";
 import { useWalrusDownload } from "../hooks/useContent";
 
 interface ContentCardProps {
@@ -18,6 +20,7 @@ interface ContentCardProps {
   isLocked: boolean;
   onClick?: () => void;
   blobId?: string; // Walrus blob ID for fetching content
+  expiryStatus?: SubscriptionStatus | null;
 }
 
 export function ContentCard({
@@ -25,6 +28,7 @@ export function ContentCard({
   isLocked,
   onClick,
   blobId,
+  expiryStatus,
 }: ContentCardProps) {
   const { download } = useWalrusDownload();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -140,6 +144,23 @@ export function ContentCard({
             <span className="ml-1">{getTypeBadge()}</span>
           </Badge>
           {isLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
+          {expiryStatus === "expiring" && (
+            <Badge
+              variant="outline"
+              className="text-xs text-amber-600 border-amber-300"
+            >
+              <Clock className="h-3 w-3 mr-1" />
+              Expiring Soon
+            </Badge>
+          )}
+          {expiryStatus === "expired" && (
+            <Badge
+              variant="outline"
+              className="text-xs text-red-600 border-red-300"
+            >
+              Expired
+            </Badge>
+          )}
         </div>
 
         <div className="w-full">

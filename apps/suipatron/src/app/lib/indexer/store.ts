@@ -8,12 +8,18 @@ import type {
   IndexedCreator,
   IndexedContent,
   IndexedAccessPurchase,
+  IndexedHandle,
+  IndexedTip,
 } from "./types";
 
 const creators = new Map<string, IndexedCreator>();
 const contentByProfile = new Map<string, IndexedContent[]>();
 const contentById = new Map<string, IndexedContent>();
 const purchasesByProfile = new Map<string, IndexedAccessPurchase[]>();
+const handlesByName = new Map<string, IndexedHandle>();
+const handlesByProfile = new Map<string, IndexedHandle>();
+const tipsByProfile = new Map<string, IndexedTip[]>();
+const tipsByTipper = new Map<string, IndexedTip[]>();
 
 /** Ordered list of profile IDs for stable pagination (insertion order) */
 const creatorOrder: string[] = [];
@@ -32,6 +38,24 @@ function ensurePurchaseList(profileId: string): IndexedAccessPurchase[] {
   if (!list) {
     list = [];
     purchasesByProfile.set(profileId, list);
+  }
+  return list;
+}
+
+function ensureTipListByProfile(profileId: string): IndexedTip[] {
+  let list = tipsByProfile.get(profileId);
+  if (!list) {
+    list = [];
+    tipsByProfile.set(profileId, list);
+  }
+  return list;
+}
+
+function ensureTipListByTipper(tipper: string): IndexedTip[] {
+  let list = tipsByTipper.get(tipper);
+  if (!list) {
+    list = [];
+    tipsByTipper.set(tipper, list);
   }
   return list;
 }
@@ -96,6 +120,42 @@ const syncStore = {
     return ensurePurchaseList(profileId).slice();
   },
 
+  upsertHandle(entry: IndexedHandle): void {
+    handlesByName.set(entry.handle, entry);
+    handlesByProfile.set(entry.profileId, entry);
+  },
+
+  getHandle(handle: string): IndexedHandle | undefined {
+    return handlesByName.get(handle);
+  },
+
+  getHandleByProfileId(profileId: string): IndexedHandle | undefined {
+    return handlesByProfile.get(profileId);
+  },
+
+  updateAccessPassExpiry(accessPassId: string, newExpiresAt: number): void {
+    for (const [, list] of purchasesByProfile) {
+      const entry = list.find((p) => p.accessPassId === accessPassId);
+      if (entry) {
+        entry.expiresAt = newExpiresAt;
+        return;
+      }
+    }
+  },
+
+  addTip(tip: IndexedTip): void {
+    ensureTipListByProfile(tip.profileId).push(tip);
+    ensureTipListByTipper(tip.tipper).push(tip);
+  },
+
+  getTipsByProfile(profileId: string): IndexedTip[] {
+    return ensureTipListByProfile(profileId).slice();
+  },
+
+  getTipsByTipper(tipper: string): IndexedTip[] {
+    return ensureTipListByTipper(tipper).slice();
+  },
+
   getLastCursor(eventType: string): string | undefined {
     return (
       globalThis as unknown as { __indexerCursors?: Record<string, string> }
@@ -122,6 +182,15 @@ export const indexerStore: IndexerStore = {
   getContentByProfile: (id) =>
     Promise.resolve(syncStore.getContentByProfile(id)),
   getSupporters: (id) => Promise.resolve(syncStore.getSupporters(id)),
+  upsertHandle: (e) => Promise.resolve(syncStore.upsertHandle(e)),
+  getHandle: (h) => Promise.resolve(syncStore.getHandle(h)),
+  getHandleByProfileId: (id) =>
+    Promise.resolve(syncStore.getHandleByProfileId(id)),
+  updateAccessPassExpiry: (id, exp) =>
+    Promise.resolve(syncStore.updateAccessPassExpiry(id, exp)),
+  addTip: (t) => Promise.resolve(syncStore.addTip(t)),
+  getTipsByProfile: (id) => Promise.resolve(syncStore.getTipsByProfile(id)),
+  getTipsByTipper: (addr) => Promise.resolve(syncStore.getTipsByTipper(addr)),
   getLastCursor: (t) => Promise.resolve(syncStore.getLastCursor(t)),
   setLastCursor: (t, c) => Promise.resolve(syncStore.setLastCursor(t, c)),
 };

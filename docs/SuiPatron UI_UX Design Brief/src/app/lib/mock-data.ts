@@ -1,0 +1,215 @@
+export interface Creator {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  suinsName?: string;
+  bio?: string;
+  price: number;
+  balance?: number;
+  contentCount: number;
+  supporterCount: number;
+}
+
+export interface Content {
+  id: string;
+  creatorId: string;
+  title: string;
+  description?: string;
+  type: 'image' | 'text' | 'pdf';
+  thumbnail?: string;
+  isLocked: boolean;
+  createdAt: Date;
+}
+
+export const mockCreators: Creator[] = [
+  {
+    id: 'creator1',
+    name: 'Alice Chen',
+    email: 'alice@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice',
+    suinsName: 'alice@suipatron.sui',
+    bio: 'Digital artist creating abstract and surreal artwork. Support to unlock my exclusive collection.',
+    price: 5,
+    balance: 125,
+    contentCount: 12,
+    supporterCount: 25,
+  },
+  {
+    id: 'creator2',
+    name: 'Bob Martinez',
+    email: 'bob@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob',
+    suinsName: 'bob@suipatron.sui',
+    bio: 'Photographer exploring urban landscapes and street photography. One-time support unlocks all my work.',
+    price: 8,
+    balance: 240,
+    contentCount: 24,
+    supporterCount: 30,
+  },
+  {
+    id: 'creator3',
+    name: 'Carol Kim',
+    email: 'carol@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carol',
+    suinsName: 'carol@suipatron.sui',
+    bio: 'Writer and poet sharing exclusive stories and poems. Get permanent access to all my work.',
+    price: 3,
+    balance: 87,
+    contentCount: 18,
+    supporterCount: 29,
+  },
+  {
+    id: 'creator4',
+    name: 'David Park',
+    email: 'david@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david',
+    suinsName: 'david@suipatron.sui',
+    bio: 'Music producer creating electronic and ambient tracks. Support once, own forever.',
+    price: 10,
+    balance: 320,
+    contentCount: 15,
+    supporterCount: 32,
+  },
+  {
+    id: 'creator5',
+    name: 'Emma Wilson',
+    email: 'emma@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma',
+    bio: 'Illustrator and character designer. No monthly fees, just one-time support.',
+    price: 6,
+    contentCount: 20,
+    supporterCount: 18,
+  },
+  {
+    id: 'creator6',
+    name: 'Frank Lee',
+    email: 'frank@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=frank',
+    suinsName: 'frank@suipatron.sui',
+    bio: 'Tutorial creator for digital art techniques. Lifetime access to all tutorials.',
+    price: 12,
+    contentCount: 30,
+    supporterCount: 45,
+  },
+];
+
+export const mockContent: Content[] = [
+  // Alice's content
+  {
+    id: 'content1',
+    creatorId: 'creator1',
+    title: 'Abstract Dreams #1',
+    description: 'First piece in my abstract series',
+    type: 'image',
+    thumbnail: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400',
+    isLocked: true,
+    createdAt: new Date('2025-02-01'),
+  },
+  {
+    id: 'content2',
+    creatorId: 'creator1',
+    title: 'Surreal Landscape',
+    description: 'Exploring impossible geometries',
+    type: 'image',
+    thumbnail: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=400',
+    isLocked: true,
+    createdAt: new Date('2025-02-03'),
+  },
+  {
+    id: 'content3',
+    creatorId: 'creator1',
+    title: 'Process Notes',
+    description: 'Behind the scenes of my creative process',
+    type: 'text',
+    isLocked: true,
+    createdAt: new Date('2025-02-05'),
+  },
+  {
+    id: 'content4',
+    creatorId: 'creator1',
+    title: 'Color Theory Guide',
+    description: 'My approach to color in digital art',
+    type: 'pdf',
+    isLocked: true,
+    createdAt: new Date('2025-02-07'),
+  },
+  
+  // Bob's content
+  {
+    id: 'content5',
+    creatorId: 'creator2',
+    title: 'Tokyo Streets',
+    description: 'Night photography in Shibuya',
+    type: 'image',
+    thumbnail: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=400',
+    isLocked: true,
+    createdAt: new Date('2025-01-28'),
+  },
+  {
+    id: 'content6',
+    creatorId: 'creator2',
+    title: 'Urban Decay',
+    description: 'Abandoned buildings series',
+    type: 'image',
+    thumbnail: 'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=400',
+    isLocked: true,
+    createdAt: new Date('2025-02-02'),
+  },
+  {
+    id: 'content7',
+    creatorId: 'creator2',
+    title: 'Photography Tips',
+    description: 'Street photography techniques',
+    type: 'text',
+    isLocked: true,
+    createdAt: new Date('2025-02-06'),
+  },
+  
+  // Carol's content
+  {
+    id: 'content8',
+    creatorId: 'creator3',
+    title: 'Midnight Reflections',
+    description: 'A collection of short poems',
+    type: 'text',
+    isLocked: true,
+    createdAt: new Date('2025-01-30'),
+  },
+  {
+    id: 'content9',
+    creatorId: 'creator3',
+    title: 'The Last Train',
+    description: 'Short story about connection',
+    type: 'text',
+    isLocked: true,
+    createdAt: new Date('2025-02-04'),
+  },
+  {
+    id: 'content10',
+    creatorId: 'creator3',
+    title: 'Writing Process',
+    description: 'How I approach creative writing',
+    type: 'pdf',
+    isLocked: true,
+    createdAt: new Date('2025-02-08'),
+  },
+];
+
+// Track which creators the user has supported
+export const getUserAccessPasses = (userId: string): string[] => {
+  const stored = localStorage.getItem(`suipatron_access_${userId}`);
+  return stored ? JSON.parse(stored) : [];
+};
+
+export const addAccessPass = (userId: string, creatorId: string) => {
+  const current = getUserAccessPasses(userId);
+  if (!current.includes(creatorId)) {
+    current.push(creatorId);
+    localStorage.setItem(`suipatron_access_${userId}`, JSON.stringify(current));
+  }
+};
+
+export const hasAccessPass = (userId: string, creatorId: string): boolean => {
+  return getUserAccessPasses(userId).includes(creatorId);
+};

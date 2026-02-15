@@ -3,9 +3,13 @@
  * Used by auth-context and frontend components.
  */
 
+import type { Tier } from "./creator.types";
+
 export interface CreatorProfile {
+  profileId?: string;
+  creatorCapId?: string;
   bio?: string;
-  price?: number;
+  tiers?: Tier[];
   balance?: number;
   contentCount?: number;
   supporterCount?: number;
