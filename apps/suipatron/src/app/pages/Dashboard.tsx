@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
 import { isEnokiConfigured } from "../lib/enoki-provider";
 import { CreateProfileForm } from "../components/CreateProfileForm";
 import { WithdrawButton } from "../components/WithdrawButton";
+import {
+  useMyCreatorProfile,
+  useMyCreatorCap,
+  useContentList,
+} from "../hooks/useCreator";
+import { useSuiPatronTransactions } from "../hooks/useTransactions";
+import {
+  useContentUploadBundled,
+} from "../hooks/useContent";
+import { onchainContentToContent } from "../lib/adapters";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { MIST_PER_SUI } from "../constants";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -28,33 +41,91 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { ContentCard } from "../components/ContentCard";
+import { NFTLabCard } from "../components/NFTLabCard";
 import { mockContent } from "../lib/mock-data";
-import { DollarSign, Users, FileUp, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  DollarSign,
+  Users,
+  FileUp,
+  Loader2,
+  CheckCircle2,
+  ExternalLink,
+} from "lucide-react";
 import toast from "react-hot-toast";
+import { WALRUS_AGGREGATOR_URL_TESTNET } from "../constants";
 
 export function Dashboard() {
-  const { user, updateUser } = useAuth();
+  const { user, walletAddress, updateUser } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const account = useCurrentAccount();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSuiNSModal, setShowSuiNSModal] = useState(false);
 
+  // On-chain queries
+  const { data: myProfile } = useMyCreatorProfile(walletAddress ?? undefined);
+  const { data: myCreatorCap } = useMyCreatorCap(walletAddress ?? undefined);
+  const { data: onchainContent } = useContentList(myProfile?.objectId);
+  const {
+    updateProfile,
+    isPending: txPending,
+  } = useSuiPatronTransactions();
+  // Using BUNDLED upload for better UX (2 signatures instead of 3)
+  // Bundles Walrus certify + publish_content into a single PTB
+  // SEAL encryption works but creators can't decrypt their own content without AccessPass
+  const { upload: uploadContent, isPending: uploadPending } =
+    useContentUploadBundled();
+
   // Form states
-  const [name, setName] = useState(user?.name || "");
-  const [bio, setBio] = useState(user?.creatorProfile?.bio || "");
+  const [name, setName] = useState(myProfile?.name || user?.name || "");
+  const [bio, setBio] = useState(
+    myProfile?.bio || user?.creatorProfile?.bio || "",
+  );
   const tiers = user?.creatorProfile?.tiers ?? [];
   const [suinsInput, setSuinsInput] = useState("");
 
-  useEffect(() => {
-    if (!user) {
-      router.push("/?signin=true");
-    }
-  }, [user, router]);
+  // Upload form states
+  const [contentTitle, setContentTitle] = useState("");
+  const [contentDescription, setContentDescription] = useState("");
+  const [contentType, setContentType] = useState<"image" | "text" | "pdf">(
+    "image",
+  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  if (!user) return null;
+  // User is a creator if they have an on-chain profile or the mock flag is set
+  const isCreator = !!myProfile || !!user?.isCreator;
 
-  const handleBecomeCreator = () => {
+  // Memoized computed values
+  const userContent = useMemo(
+    () =>
+      onchainContent && onchainContent.length > 0
+        ? onchainContent.map((c) =>
+            onchainContentToContent(c, myProfile?.objectId || user?.id || "", true),
+          )
+        : mockContent.filter((c) => c.creatorId === (user?.id || "")),
+    [onchainContent, myProfile?.objectId, user?.id],
+  );
+
+  const displayBalance = useMemo(
+    () =>
+      myProfile
+        ? myProfile.balance / MIST_PER_SUI
+        : user?.creatorProfile?.balance || 0,
+    [myProfile, user?.creatorProfile?.balance],
+  );
+
+  const displaySupporters = useMemo(
+    () =>
+      myProfile
+        ? myProfile.totalSupporters
+        : user?.creatorProfile?.supporterCount || 0,
+    [myProfile, user?.creatorProfile?.supporterCount],
+  );
+
+  // Event handlers
+  const handleBecomeCreator = useCallback(() => {
     updateUser({
       isCreator: true,
       creatorProfile: {
@@ -75,26 +146,46 @@ export function Dashboard() {
     });
     setIsEditing(true);
     toast.success("Welcome! Set up your creator profile.");
-  };
+  }, [updateUser]);
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = useCallback(async () => {
+    if (!user) {
+      toast.error("Please sign in first");
+      return;
+    }
+
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    updateUser({
-      name,
-      creatorProfile: {
-        ...user.creatorProfile,
-        bio,
-      },
-    });
+    try {
+      if (walletAddress && myProfile && myCreatorCap) {
+        await updateProfile(myProfile.objectId, myCreatorCap.objectId, {
+          name,
+          bio,
+        });
+        queryClient.invalidateQueries({ queryKey: ["myCreatorProfile"] });
+        toast.success("Profile updated on-chain!");
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateUser({
+          name,
+          creatorProfile: {
+            ...user.creatorProfile,
+            bio,
+          },
+        });
+        toast.success("Profile updated successfully");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update profile",
+      );
+    }
 
     setIsSaving(false);
     setIsEditing(false);
-    toast.success("Profile updated successfully");
-  };
+  }, [user, walletAddress, myProfile, myCreatorCap, name, bio, updateProfile, queryClient, updateUser]);
 
-  const handleClaimSuiNS = async () => {
+  const handleClaimSuiNS = useCallback(async () => {
     if (!suinsInput.trim()) return;
 
     setIsSaving(true);
@@ -107,10 +198,80 @@ export function Dashboard() {
     setIsSaving(false);
     setShowSuiNSModal(false);
     setSuinsInput("");
-    toast.success("SuiNS name claimed successfully!");
-  };
+    toast.success("Display name set successfully!");
+  }, [suinsInput, updateUser]);
 
-  if (!user.isCreator) {
+  const handleContentUpload = useCallback(async () => {
+    if (!selectedFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+    if (!contentTitle.trim()) {
+      toast.error("Please enter a title");
+      return;
+    }
+    if (!myProfile?.objectId || !myCreatorCap?.objectId) {
+      toast.error("Creator profile not found");
+      return;
+    }
+    if (!account) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    try {
+      const result = await uploadContent(
+        {
+          file: selectedFile,
+          title: contentTitle,
+          description: contentDescription,
+          contentType,
+        },
+        myProfile.objectId,
+        myCreatorCap.objectId,
+      );
+
+      // Log blob ID for SEAL verification
+      console.log("🔒 SEAL VERIFICATION - Blob ID:", result.blobId);
+      console.log(
+        "🔗 Check encrypted blob at:",
+        `https://aggregator.walrus-testnet.walrus.space/blobs/${result.blobId}`,
+      );
+
+      toast.success("Content uploaded to Walrus and published on-chain!");
+      setShowUploadModal(false);
+
+      // Reset form
+      setContentTitle("");
+      setContentDescription("");
+      setContentType("image");
+      setSelectedFile(null);
+
+      // Invalidate and refetch content list for this profile
+      await queryClient.invalidateQueries({
+        queryKey: ["contentList", myProfile.objectId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ["contentList", myProfile.objectId],
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload content",
+      );
+    }
+  }, [selectedFile, contentTitle, myProfile, myCreatorCap, account, uploadContent, contentDescription, contentType, queryClient]);
+
+  // Effect to redirect if not logged in
+  useEffect(() => {
+    if (!user) {
+      router.push("/?signin=true");
+    }
+  }, [user, router]);
+
+  // Early returns AFTER all hooks
+  if (!user) return null;
+
+  if (!isCreator) {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center px-4 py-12">
         <Card className="max-w-2xl w-full">
@@ -165,8 +326,6 @@ export function Dashboard() {
     );
   }
 
-  const userContent = mockContent.filter((c) => c.creatorId === user.id);
-
   return (
     <div className="flex flex-col min-h-screen">
       <section className="py-12 px-4 border-b bg-muted/30">
@@ -188,9 +347,7 @@ export function Dashboard() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {user.creatorProfile?.balance || 0} SUI
-                </div>
+                <div className="text-2xl font-bold">{displayBalance} SUI</div>
                 {isEnokiConfigured ? (
                   <WithdrawButton
                     variant="outline"
@@ -213,9 +370,7 @@ export function Dashboard() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {user.creatorProfile?.supporterCount || 0}
-                </div>
+                <div className="text-2xl font-bold">{displaySupporters}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Total supporters
                 </p>
@@ -278,7 +433,7 @@ export function Dashboard() {
                     size="sm"
                     onClick={() => setShowSuiNSModal(true)}
                   >
-                    Claim SuiNS Name
+                    Set Display Name
                   </Button>
                 )}
               </div>
@@ -362,13 +517,55 @@ export function Dashboard() {
             <CardContent>
               {userContent.length > 0 ? (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {userContent.map((content) => (
-                    <ContentCard
-                      key={content.id}
-                      content={content}
-                      isLocked={false}
-                    />
-                  ))}
+                  {userContent.map((content) => {
+                    const blobId = (content as any).blobId;
+                    const blobUrl = blobId
+                      ? `${WALRUS_AGGREGATOR_URL_TESTNET}/blobs/${blobId}`
+                      : null;
+
+                    return (
+                      <div key={content.id} className="space-y-2">
+                        <ContentCard
+                          content={content}
+                          isLocked={false}
+                          blobId={blobId}
+                        />
+                        {blobUrl && (
+                          <div className="flex gap-2">
+                            <a
+                              href={blobUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1"
+                            >
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                🔒 Encrypted
+                              </Button>
+                            </a>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                // The decrypted version is already shown in the ContentCard above
+                                // For demo, we can indicate this or implement a full-screen view
+                                alert(
+                                  "The decrypted version is displayed in the card above. The encrypted blob (left button) shows garbage data from Walrus.",
+                                );
+                              }}
+                            >
+                              ✓ Decrypted
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 space-y-4">
@@ -386,6 +583,9 @@ export function Dashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* NFT Lab */}
+          <NFTLabCard />
         </div>
       </section>
 
@@ -402,20 +602,40 @@ export function Dashboard() {
             <div className="space-y-2">
               <Label>Content Type</Label>
               <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "image" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("image")}
+                >
                   Image
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "text" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("text")}
+                >
                   Text
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button
+                  type="button"
+                  variant={contentType === "pdf" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setContentType("pdf")}
+                >
                   PDF
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" placeholder="Content title..." />
+              <Input
+                id="title"
+                placeholder="Content title..."
+                value={contentTitle}
+                onChange={(e) => setContentTitle(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -423,13 +643,33 @@ export function Dashboard() {
                 id="description"
                 placeholder="Optional description..."
                 rows={3}
+                value={contentDescription}
+                onChange={(e) => setContentDescription(e.target.value)}
               />
             </div>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center">
-              <FileUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">
-                Drop your file here or click to browse
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">File</Label>
+              <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors">
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setSelectedFile(file);
+                  }}
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <FileUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  {selectedFile ? (
+                    <p className="text-sm font-medium">{selectedFile.name}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Click to select a file
+                    </p>
+                  )}
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -437,29 +677,34 @@ export function Dashboard() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                toast.success("Content uploaded successfully!");
-                setShowUploadModal(false);
-              }}
+              disabled={uploadPending || !selectedFile || !contentTitle.trim()}
+              onClick={handleContentUpload}
             >
-              Publish
+              {uploadPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading to Walrus...
+                </>
+              ) : (
+                "Publish"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* SuiNS Modal */}
+      {/* Display Name Modal */}
       <Dialog open={showSuiNSModal} onOpenChange={setShowSuiNSModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Claim Your SuiNS Name</DialogTitle>
+            <DialogTitle>Set Your Display Name</DialogTitle>
             <DialogDescription>
-              Get a human-readable identity for your creator profile
+              Choose a display name for your creator profile
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="suins">Choose your name</Label>
+              <Label htmlFor="suins">Choose your display name</Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id="suins"
@@ -476,8 +721,42 @@ export function Dashboard() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                This will be your unique identity on SuiPatron
+                Note: This is a display name only, not a registered SuiNS name
               </p>
+            </div>
+
+            {/* SuiNS Auto-Resolution Info */}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+              <div className="flex items-start space-x-2">
+                <svg
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="text-xs text-blue-900 dark:text-blue-100">
+                  <p className="font-semibold mb-1">Have a real SuiNS name?</p>
+                  <p>
+                    If you own a SuiNS name (e.g., alice.sui), it will
+                    automatically appear on your profile! Register at{" "}
+                    <a
+                      href="https://suins.io"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-blue-700"
+                    >
+                      suins.io
+                    </a>
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -491,10 +770,10 @@ export function Dashboard() {
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Claiming...
+                  Setting...
                 </>
               ) : (
-                "Claim Name"
+                "Set Display Name"
               )}
             </Button>
           </DialogFooter>

@@ -3,7 +3,7 @@
  * and upserts into the store. Uses getObject to fill fields not in events.
  */
 
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { getIndexerStore } from "./get-store";
 import type {
   IndexedCreator,
@@ -42,7 +42,7 @@ function getPackageId(): string {
   return id;
 }
 
-function getRpcUrl(): string {
+function _getRpcUrl(): string {
   const network =
     process.env.NEXT_PUBLIC_SUI_NETWORK ??
     process.env.VITE_SUI_NETWORK ??
@@ -116,7 +116,13 @@ export async function runIndexer(): Promise<{
   errors: string[];
 }> {
   const packageId = getPackageId();
-  const client = new SuiClient({ url: getRpcUrl() });
+  const network = (process.env.NEXT_PUBLIC_SUI_NETWORK ??
+    process.env.VITE_SUI_NETWORK ??
+    "testnet") as "testnet" | "devnet" | "mainnet";
+  const client = new SuiJsonRpcClient({
+    network,
+    url: getJsonRpcFullnodeUrl(network),
+  });
   const store = getIndexerStore();
   const fullType = (name: (typeof EVENT_TYPES)[number]) => {
     const mod = EVENT_MODULE[name] ?? "suipatron";

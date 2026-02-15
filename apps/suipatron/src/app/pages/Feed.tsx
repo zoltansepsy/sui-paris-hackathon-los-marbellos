@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 import { useAccessPasses } from "../lib/access-pass";
 import { getSubscriptionStatus } from "../lib/subscription-utils";
+import { useMyAccessPasses } from "../hooks/useAccessPass";
+import { useCreatorProfilesByIds, useCreatorProfiles, useContentList } from "../hooks/useCreator";
+import { creatorProfileToCreator, onchainContentToContent } from "../lib/adapters";
+import { LoadingState } from "../components/LoadingState";
 import {
   Card,
   CardContent,
@@ -15,12 +19,44 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { ContentCard } from "../components/ContentCard";
-import { mockCreators, mockContent } from "../lib/mock-data";
+import type { Creator, Content } from "@/shared/types/creator.types";
 import { Heart, Clock } from "lucide-react";
 
 export function Feed() {
-  const { user } = useAuth();
+  const { user, walletAddress } = useAuth();
   const { entries, getEntry } = useAccessPasses(user?.id);
+  const { data: onchainPasses, isLoading: passesLoading } = useMyAccessPasses(
+    walletAddress ?? undefined,
+  );
+
+  // Get unique creator profile IDs from access passes
+  const supportedCreatorIds = onchainPasses
+    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
+    : entries.map((e) => e.creatorId);
+
+  // Fetch the actual creator profiles for supported creators
+  const {
+    data: onchainCreatorProfiles,
+    isLoading: creatorsLoading,
+  } = useCreatorProfilesByIds(
+    supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
+  );
+
+  // Fetch all creators to find the most supported one (for empty state)
+  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } = useCreatorProfiles();
+
+  // Find the most supported creator
+  const mostSupportedCreator = allCreatorProfiles
+    ? allCreatorProfiles.reduce((max, current) =>
+        current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
+        allCreatorProfiles[0]
+      )
+    : null;
+
+  // Fetch content for the most supported creator (for empty state)
+  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } = useContentList(
+    mostSupportedCreator?.objectId
+  );
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -39,7 +75,7 @@ export function Feed() {
               Your feed shows content from creators you support
             </p>
             <Link href="/?signin=true">
-              <Button className="w-full">Sign in with Google</Button>
+              <Button className="w-full">Connect Wallet</Button>
             </Link>
           </CardContent>
         </Card>
@@ -47,25 +83,35 @@ export function Feed() {
     );
   }
 
-  // Include all creators with an access pass entry (even expired — they show with badges)
-  const supportedCreatorIds = entries.map((e) => e.creatorId);
-  const supportedCreators = mockCreators.filter((c) =>
-    supportedCreatorIds.includes(c.id),
-  );
+  // Convert on-chain profiles to UI Creator type
+  const supportedCreators: Creator[] = onchainCreatorProfiles
+    ? onchainCreatorProfiles.map(creatorProfileToCreator)
+    : [];
 
-  const feedContent = supportedCreators
-    .flatMap((creator) => {
-      const creatorContent = mockContent.filter(
-        (c) => c.creatorId === creator.id,
-      );
-      return creatorContent.map((content) => ({
-        ...content,
-        creator,
-      }));
-    })
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // For now, use supportedCreatorIds to show creator links
+  const feedContent: (Content & { creator: Creator })[] = [];
+
+  if (passesLoading || creatorsLoading) {
+    return <LoadingState />;
+  }
 
   if (supportedCreators.length === 0) {
+    // Show loading while fetching the most supported creator
+    if (allCreatorsLoading || mostSupportedContentLoading) {
+      return <LoadingState />;
+    }
+
+    // Convert most supported creator's content to UI format
+    const previewContent = mostSupportedContent && mostSupportedCreator
+      ? mostSupportedContent.map((c) =>
+          onchainContentToContent(c, mostSupportedCreator.objectId, false)
+        )
+      : [];
+
+    const previewCreator = mostSupportedCreator
+      ? creatorProfileToCreator(mostSupportedCreator)
+      : null;
+
     return (
       <div className="flex flex-col min-h-screen">
         <section className="py-12 px-4 border-b bg-muted/30">
@@ -77,23 +123,64 @@ export function Feed() {
           </div>
         </section>
 
-        <section className="flex-1 flex items-center justify-center px-4 py-12">
-          <Card className="max-w-md w-full text-center">
-            <CardContent className="pt-6 space-y-4">
-              <Heart className="h-16 w-16 text-muted-foreground mx-auto" />
-              <div>
-                <h3 className="font-semibold text-lg mb-2">
-                  No supported creators yet
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Support a creator to see their content in your feed
-                </p>
+        <section className="flex-1 px-4 py-12">
+          <div className="container mx-auto max-w-6xl space-y-8">
+            <Card className="text-center">
+              <CardContent className="pt-6 space-y-4">
+                <Heart className="h-16 w-16 text-muted-foreground mx-auto" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">
+                    No supported creators yet
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Support a creator to unlock their content
+                  </p>
+                </div>
+                <Link href="/explore">
+                  <Button>Explore Creators</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Show most supported creator's content (locked) */}
+            {previewCreator && previewContent.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold">
+                    Popular Content from {previewCreator.name}
+                  </h2>
+                  <Link href={`/creator/${previewCreator.id}`}>
+                    <Button variant="outline">View Creator</Button>
+                  </Link>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {previewContent.map((content) => (
+                    <Link
+                      key={content.id}
+                      href={`/creator/${previewCreator.id}`}
+                      className="space-y-3"
+                    >
+                      <ContentCard
+                        content={content}
+                        isLocked={true}
+                        blobId={"blobId" in content ? (content as any).blobId : undefined}
+                      />
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="text-center pt-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Support {previewCreator.name} for {previewCreator.tiers[0]?.price ?? 0} SUI to unlock all content
+                  </p>
+                  <Link href={`/creator/${previewCreator.id}`}>
+                    <Button>Support Creator</Button>
+                  </Link>
+                </div>
               </div>
-              <Link href="/explore">
-                <Button>Explore Creators</Button>
-              </Link>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </section>
       </div>
     );

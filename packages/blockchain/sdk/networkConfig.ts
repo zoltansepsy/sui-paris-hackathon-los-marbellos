@@ -1,15 +1,18 @@
-import { getFullnodeUrl } from "@mysten/sui/client";
+import { getJsonRpcFullnodeUrl as getFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { createNetworkConfig } from "@mysten/dapp-kit";
 
 const { networkConfig, useNetworkVariable, useNetworkVariables } =
   createNetworkConfig({
     devnet: {
+      network: "devnet",
       url: getFullnodeUrl("devnet"),
       variables: {
-        // Add package IDs after deployment, e.g. packageId: "0x...",
+        packageId: "",
+        platformId: "",
       },
     },
     testnet: {
+      network: "testnet",
       url: getFullnodeUrl("testnet"),
       variables: {
         packageId:
@@ -21,9 +24,11 @@ const { networkConfig, useNetworkVariable, useNetworkVariables } =
       },
     },
     mainnet: {
+      network: "mainnet",
       url: getFullnodeUrl("mainnet"),
       variables: {
-        // Add package IDs after deployment, e.g. packageId: "0x...",
+        packageId: "",
+        platformId: "",
       },
     },
   });

@@ -11,8 +11,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@mysten/dapp-kit": "^0.19.11",
-    "@mysten/sui": "^1.45.2"
+    "@mysten/dapp-kit": "^1.0.3",
+    "@mysten/sui": "^2.4.0"
   },
   "devDependencies": {
     "typescript": "^5"

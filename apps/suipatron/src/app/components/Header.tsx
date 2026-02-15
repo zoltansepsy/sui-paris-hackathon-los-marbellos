@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
+import { ConnectButton } from "@mysten/dapp-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import {
@@ -22,10 +23,17 @@ import {
   Menu,
 } from "lucide-react";
 import { useState } from "react";
+import { useSuinsName } from "../hooks/useSuins";
 
 export function Header() {
-  const { user, signOut } = useAuth();
+  const { user, walletAddress, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Automatically resolve SuiNS name from wallet address
+  const { data: resolvedSuinsName } = useSuinsName(walletAddress ?? undefined);
+
+  // Use resolved name, fallback to user.suinsName, or none
+  const displaySuinsName = resolvedSuinsName ?? user?.suinsName;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -83,9 +91,9 @@ export function Header() {
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
                       <p className="font-medium text-sm">{user.name}</p>
-                      {user.suinsName && (
+                      {displaySuinsName && (
                         <Badge variant="secondary" className="w-fit text-xs">
-                          {user.suinsName}
+                          {displaySuinsName}
                         </Badge>
                       )}
                     </div>
@@ -175,14 +183,7 @@ export function Header() {
               </Sheet>
             </>
           ) : (
-            <>
-              <Link href="/?signin=true" className="hidden sm:block">
-                <Button>Sign in with Google</Button>
-              </Link>
-              <Link href="/?signin=true" className="sm:hidden">
-                <Button size="sm">Sign in</Button>
-              </Link>
-            </>
+            <ConnectButton />
           )}
         </div>
       </div>

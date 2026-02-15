@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(pnpm dev:*)",
+      "WebFetch(domain:gateway.walrus.space)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm run build:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(python3:*)",
+      "Bash(npx next build:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm ls:*)",
+      "Bash(npm view:*)",
+      "Bash(npm pack:*)",
+      "Bash(pnpm update:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(npx vercel inspect:*)",
+      "Bash(pnpm install:*)",
+      "Bash(sui client publish:*)"
+    ]
+  }
+}

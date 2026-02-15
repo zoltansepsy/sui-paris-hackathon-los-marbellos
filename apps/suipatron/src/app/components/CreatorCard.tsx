@@ -1,15 +1,24 @@
+"use client";
+
 import Link from "next/link";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Users } from "lucide-react";
-import { Creator } from "../lib/mock-data";
+import type { Creator } from "@/shared/types/creator.types";
+import { useSuinsName } from "../hooks/useSuins";
 
 interface CreatorCardProps {
   creator: Creator;
 }
 
 export function CreatorCard({ creator }: CreatorCardProps) {
+  // Automatically resolve SuiNS name from owner address
+  const { data: resolvedSuinsName } = useSuinsName(creator.owner);
+
+  // Use resolved name, fallback to stored name, or none
+  const displaySuinsName = resolvedSuinsName ?? creator.suinsName;
+
   return (
     <Link href={`/creator/${creator.id}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
@@ -25,9 +34,9 @@ export function CreatorCard({ creator }: CreatorCardProps) {
             <div className="flex-1 space-y-2">
               <div>
                 <h3 className="font-semibold">{creator.name}</h3>
-                {creator.suinsName && (
+                {displaySuinsName && (
                   <Badge variant="secondary" className="mt-1 text-xs">
-                    {creator.suinsName}
+                    {displaySuinsName}
                   </Badge>
                 )}
               </div>

@@ -5,6 +5,7 @@ export type { Creator, Content } from "@/shared/types/creator.types";
 export const mockCreators: Creator[] = [
   {
     id: "creator1",
+    owner: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     name: "Alice Chen",
     email: "alice@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
@@ -32,6 +33,7 @@ export const mockCreators: Creator[] = [
   },
   {
     id: "creator2",
+    owner: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
     name: "Bob Martinez",
     email: "bob@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
@@ -59,6 +61,7 @@ export const mockCreators: Creator[] = [
   },
   {
     id: "creator3",
+    owner: "0x567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234",
     name: "Carol Kim",
     email: "carol@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
@@ -79,6 +82,7 @@ export const mockCreators: Creator[] = [
   },
   {
     id: "creator4",
+    owner: "0x7890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456",
     name: "David Park",
     email: "david@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
@@ -113,6 +117,7 @@ export const mockCreators: Creator[] = [
   },
   {
     id: "creator5",
+    owner: "0x90abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
     name: "Emma Wilson",
     email: "emma@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma",
@@ -131,6 +136,7 @@ export const mockCreators: Creator[] = [
   },
   {
     id: "creator6",
+    owner: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef123456789",
     name: "Frank Lee",
     email: "frank@example.com",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=frank",

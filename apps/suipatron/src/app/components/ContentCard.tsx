@@ -1,19 +1,25 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import {
   Lock,
   Image as ImageIcon,
   FileText,
-  FileType,
+  BookOpen,
+  Loader2,
   Clock,
 } from "lucide-react";
-import { Content } from "../lib/mock-data";
+import type { Content } from "@/shared/types/creator.types";
 import type { SubscriptionStatus } from "../lib/subscription-utils";
+import { useWalrusDownload } from "../hooks/useContent";
 
 interface ContentCardProps {
   content: Content;
   isLocked: boolean;
   onClick?: () => void;
+  blobId?: string; // Walrus blob ID for fetching content
   expiryStatus?: SubscriptionStatus | null;
 }
 
@@ -21,16 +27,50 @@ export function ContentCard({
   content,
   isLocked,
   onClick,
+  blobId,
   expiryStatus,
 }: ContentCardProps) {
-  const getTypeIcon = () => {
+  const { download } = useWalrusDownload();
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoadingBlob, setIsLoadingBlob] = useState(false);
+
+  // Fetch blob from Walrus if blobId is provided (only for images)
+  useEffect(() => {
+    if (blobId && !isLocked && content.type === "image") {
+      setIsLoadingBlob(true);
+      download(blobId)
+        .then((bytes) => {
+          // For images, create blob URL directly
+          const blob = new Blob([new Uint8Array(bytes)]);
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        })
+        .catch((error) => {
+          console.error("Failed to download blob:", error);
+        })
+        .finally(() => {
+          setIsLoadingBlob(false);
+        });
+    }
+
+    // Cleanup blob URL on unmount
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobId, isLocked, download, content.type]);
+
+  const displayUrl = blobUrl || content.thumbnail;
+  const getTypeIcon = (size: "sm" | "lg" = "sm") => {
+    const className = size === "sm" ? "h-3 w-3" : "h-16 w-16";
     switch (content.type) {
       case "image":
-        return <ImageIcon className="h-3 w-3" />;
+        return <ImageIcon className={className} />;
       case "text":
-        return <FileText className="h-3 w-3" />;
+        return <FileText className={className} />;
       case "pdf":
-        return <FileType className="h-3 w-3" />;
+        return <BookOpen className={className} />;
     }
   };
 
@@ -52,18 +92,34 @@ export function ContentCard({
     >
       <CardContent className="p-0">
         <div className="relative aspect-video bg-muted flex items-center justify-center">
-          {content.thumbnail && !isLocked ? (
+          {isLoadingBlob ? (
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          ) : content.type === "pdf" ? (
+            // PDFs show a book icon instead of preview
+            <div className="flex flex-col items-center justify-center space-y-2">
+              {isLocked ? (
+                <>
+                  {getTypeIcon("lg")}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                    <Lock className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                </>
+              ) : (
+                <div className="text-muted-foreground">{getTypeIcon("lg")}</div>
+              )}
+            </div>
+          ) : displayUrl && !isLocked ? (
             <img
-              src={content.thumbnail}
+              src={displayUrl}
               alt={content.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
-          ) : content.thumbnail ? (
+          ) : displayUrl ? (
             <>
               <img
-                src={content.thumbnail}
+                src={displayUrl}
                 alt={content.title}
-                className="w-full h-full object-cover blur-xl opacity-30"
+                className="w-full h-full object-contain blur-xl opacity-30"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Lock className="h-12 w-12 text-muted-foreground" />
@@ -74,7 +130,7 @@ export function ContentCard({
               {isLocked ? (
                 <Lock className="h-12 w-12 text-muted-foreground" />
               ) : (
-                getTypeIcon()
+                getTypeIcon("lg")
               )}
             </div>
           )}

@@ -3,7 +3,9 @@
 import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { networkConfig } from "@hack/blockchain";
+import { AuthProvider } from "./lib/auth-context";
 import { useState } from "react";
+import "@mysten/dapp-kit/dist/index.css";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -21,8 +23,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider autoConnect storageKey="sui-paris-hack-wallet">
-          {children}
+        <WalletProvider autoConnect storageKey="suipatron-wallet">
+          <AuthProvider>{children}</AuthProvider>
         </WalletProvider>
       </SuiClientProvider>
     </QueryClientProvider>

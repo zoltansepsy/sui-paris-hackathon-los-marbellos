@@ -21,7 +21,7 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Label } from "../components/ui/label";
-import type { Creator } from "../lib/mock-data";
+import type { Creator } from "@/shared/types/creator.types";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 

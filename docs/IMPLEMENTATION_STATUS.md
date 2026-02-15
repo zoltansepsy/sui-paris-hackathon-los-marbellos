@@ -256,6 +256,67 @@ Full service layer for tips and platform fee management. On branch `zoltan/phase
 - `buildSetPlatformFeeTx(adminCapId, feeBps)` — admin-only, sets fee in basis points (0–10000)
 - `buildWithdrawPlatformFeesTx(adminCapId)` — admin-only, withdraws platform treasury
 
+### Contract Deployment (A9)
+
+Package deployed to SUI Testnet.
+
+| Item | Value |
+|------|-------|
+| Package ID | `0x470bfc45bf7dbc92bed9bf723ca7335b189332a909f5d1370622993600876666` |
+| Platform ID | `0xb9010ffc6672232da2a699d092bc6cd7ebf2afba02588527d5b608f7690cdb2c` |
+| Registry ID | `0x8effd5679d0bbd647b31cb7843b269b4f16c7714fa51712a043bc058a5aac5d8` |
+
+Recorded in `packages/blockchain/sdk/networkConfig.ts` as network variables.
+
+### Service Layer (P3–P14)
+
+Complete service layer bridging Move contracts and React UI. All files type-check with zero errors against `@mysten/sui@2.4.0`, `@mysten/dapp-kit@1.0.3`, `@mysten/seal@1.0.1`, `@mysten/walrus@1.0.3`.
+
+**Dependencies installed:**
+- `@mysten/sui@2.4.0` (upgraded from 1.x — breaking v2 API)
+- `@mysten/dapp-kit@1.0.3` (upgraded from 0.x)
+- `@mysten/seal@1.0.1`
+- `@mysten/walrus@1.0.3`
+- `@mysten/enoki@1.0.3`
+
+**Network config** (`packages/blockchain/sdk/networkConfig.ts`):
+- Updated imports for SDK v2 (`getJsonRpcFullnodeUrl` from `@mysten/sui/jsonRpc`)
+- Added `network` property required by dapp-kit v1
+- `packageId`, `platformId`, and `registryId` set for testnet
+
+**Constants** (`apps/dapp/app/constants.ts`):
+- SEAL canonical key servers (3 testnet servers), threshold = 2
+- Walrus aggregator URL, upload relay URL, WASM URL, default epochs
+- Clock object ID, MIST conversion, supported content types
+
+**Type definitions** (`apps/dapp/app/types/index.ts`):
+- TypeScript interfaces: `CreatorProfile`, `Content`, `AccessPass`, `CreatorCap`
+- Event types: `ProfileCreatedEvent`, `ContentPublishedEvent`, `AccessPurchasedEvent`, `EarningsWithdrawnEvent`, `ProfileUpdatedEvent`
+- DTOs: `ProfileUpdateParams`, `ContentUploadParams`
+- Parser functions: `parseCreatorProfile()`, `parseAccessPass()`, `parseCreatorCap()`, `parseContent()` — handle Move→TS field mapping (Option, u64-as-string, ID)
+
+**Services** (`apps/dapp/app/services/`):
+
+| File | Description |
+|------|-------------|
+| `transactionService.ts` | PTB builders for all 5 entry functions. Uses `tx.pure.option()` for partial updates, `tx.splitCoins()` for payment. |
+| `creatorService.ts` | On-chain reads: `getCreatorProfile()`, `getCreatorProfiles()` (event-based discovery), `getContentList()` (dynamic fields), `getCreatorByOwner()`, `getCreatorCapByOwner()`. |
+| `accessPassService.ts` | AccessPass queries: `getAccessPassesByOwner()`, `getAccessPassForCreator()`, `hasAccessToCreator()`. |
+| `walrusService.ts` | Upload via flow API (encode→register→upload→certify) with upload relay. Download via aggregator HTTP with SDK fallback. Lazy WalrusClient init to avoid SSR WASM issues. |
+| `sealService.ts` | Encrypt with creator profile identity. Decrypt with dynamic server matching (parses `EncryptedObject` BCS to find servers). Session key creation with wallet personal message signing. |
+| `contentService.ts` | Orchestrator: `uploadContent()` = read file → SEAL encrypt → Walrus upload → build publish_content tx. `downloadContent()` = Walrus download → SEAL decrypt. Avatar upload/download (no encryption). |
+| `index.ts` | Barrel exports for all services and factory functions. |
+
+**React hooks** (`apps/dapp/app/hooks/`):
+
+| File | Hooks |
+|------|-------|
+| `useCreator.ts` | `useCreatorProfile(id)`, `useCreatorProfiles(limit?)`, `useMyCreatorProfile(address)`, `useMyCreatorCap(address)`, `useContentList(profileId)` |
+| `useAccessPass.ts` | `useMyAccessPasses(address)`, `useHasAccess(address, creatorProfileId)` |
+| `useTransactions.ts` | `useSuiPatronTransactions()` — returns `{ createProfile, updateProfile, purchaseAccess, withdrawEarnings, isPending }` |
+| `useContent.ts` | `useContentUpload()` — full encrypt+upload+publish flow. `useContentDecrypt()` — download+decrypt with session key lifecycle (auto-create, 10min TTL, auto-recreate on expiry). |
+| `index.ts` | Barrel exports for all hooks. |
+
 ### Documentation
 
 | File | Description |
@@ -271,18 +332,8 @@ Full service layer for tips and platform fee management. On branch `zoltan/phase
 
 ## Remaining — MVP Tasks
 
-### 1. Contract Deployment — Phase 2 (A9)
+### 1. Contract Deployment — Post-deploy Tasks
 
-Redeploy the Phase 2 Move package to SUI Testnet and record new object IDs.
-
-```bash
-cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
-```
-
-After publishing, record:
-- [ ] Package ID → `NEXT_PUBLIC_PACKAGE_ID` (or `VITE_PACKAGE_ID`) in `apps/suipatron/.env`
-- [ ] Platform object ID → `NEXT_PUBLIC_PLATFORM_ID` (or `VITE_PLATFORM_ID`) in `apps/suipatron/.env`
-- [ ] Registry object ID → new env var or constant
 - [ ] AdminCap object ID (keep safe, not in env)
 - [ ] Update Enoki Portal with new Package ID in allowed move call targets
 - [ ] Smoke test via CLI: `sui client call --package {PKG} --module suipatron --function create_profile ...`
@@ -290,6 +341,7 @@ After publishing, record:
 ### 2. Frontend Scaffold (Z1, J1–J4)
 
 - [x] Next.js app in `apps/suipatron/` (not Vite) — design system, layout, landing, explore
+- [x] Install SUI SDKs: `@mysten/sui`, `@mysten/dapp-kit`, `@mysten/enoki`, `@mysten/seal`, `@mysten/walrus`
 - [ ] Wire Explore to `GET /api/creators` (currently uses mock data)
 - [ ] Replace mock auth with Enoki zkLogin; "Sign in with Google" CTA
 
@@ -315,7 +367,7 @@ After publishing, record:
 - [x] `GET /api/creator/:id/tips` — list tips received by a creator — **apps/suipatron**: `src/app/api/creator/[id]/tips/route.ts`
 - [x] `GET /api/platform` — current platform fee config + stats (on-chain read) — **apps/suipatron**: `src/app/api/platform/route.ts`
 
-### 5. Integration Hooks / Services (P3–P14)
+### 5. Integration — Remaining Items
 
 PTB builders (transaction construction) — **Updated for Phase 2 API:**
 - [x] `buildCreateProfileTx(name, bio, tierName, tierDesc, tierPrice, tierLevel, tierDurationMs)` — creates CreatorProfile + CreatorCap
@@ -342,11 +394,6 @@ Sponsored transaction flow:
 - [x] Wire up Enoki sponsor flow (build → sponsor → sign → execute) — **apps/suipatron**: `src/app/lib/sponsor-flow.ts`, `use-sponsor-transaction.ts`
 - [x] Dashboard: create profile, withdraw — **CreateProfileForm.tsx**, **WithdrawButton.tsx**
 - [x] SupportModal: purchase access
-
-React hooks:
-- [ ] `useMyAccessPasses()` — fetch user's AccessPass NFTs via `getOwnedObjects`
-- [ ] `useCreatorProfile(id)` — fetch creator profile data
-- [ ] `useContentDecrypt(blobId, accessPass)` — download + decrypt content
 
 ### 6. UI Pages (J5–J13)
 
@@ -382,7 +429,7 @@ React hooks:
 
 ## Technical Notes & Gotchas
 
-These were discovered during smart contract implementation. Keep adding to this list.
+These were discovered during implementation. Keep adding to this list.
 
 ### Move / SUI CLI
 
@@ -393,6 +440,15 @@ These were discovered during smart contract implementation. Keep adding to this 
 - **`#[allow(unused_const)]`**: Use on error codes that are defined for documentation but not directly referenced in the module (e.g., `ENoTiers`, `EAccessPassExpired` which are asserted via other patterns).
 - **Unused params**: Prefix with `_` (e.g., `_ctx: &mut TxContext`) for parameters required by entry function signatures but not used in the body.
 
+### SUI SDK v2 Migration (`@mysten/sui@2.4.0`)
+
+- **`SuiClient` removed**: Replaced by `CoreClient` (minimal: getObject, getDynamicField, etc.) from `@mysten/sui/client` and `SuiJsonRpcClient` (full JSON-RPC: queryEvents, getOwnedObjects, multiGetObjects, etc.) from `@mysten/sui/jsonRpc`.
+- **`getFullnodeUrl` removed**: Use `getJsonRpcFullnodeUrl` from `@mysten/sui/jsonRpc`.
+- **`SuiObjectData`**: Now exported from `@mysten/sui/jsonRpc` (not `@mysten/sui/client`).
+- **`useSuiClient()`**: Returns `SuiJsonRpcClient` in dapp-kit v1. This satisfies both `SealCompatibleClient` and `ClientWithCoreApi` since `SuiJsonRpcClient` has a `core: JSONRpcCoreClient` property.
+- **`createNetworkConfig`**: Now requires a `network` property in each config entry (e.g., `network: "testnet"`).
+- **`tx.pure.option()`**: Works in v2 for both `"string"` and `"u64"` types — tested and verified.
+
 ### SEAL Encryption
 
 - **Identity format (Phase 2 — tiered)**: 40 bytes = `[CreatorProfile ID (32 bytes)][min_tier_level (8 bytes, little-endian u64)]`. Content at different tier levels uses different SEAL identities.
@@ -400,7 +456,15 @@ These were discovered during smart contract implementation. Keep adding to this 
 - **Clock in `seal_approve`**: Phase 2 adds `&Clock` (object `0x6`) to `seal_approve` for subscription expiry validation. SEAL key servers must include Clock in their PTB.
 - **`packageId` for SEAL SDK**: Must be hex-encoded WITHOUT the `0x` prefix (check SDK docs).
 - **Threshold**: Set to 2 (at least 2 key servers must agree).
-- **Session keys**: Cached per-user per-package. First decrypt requires wallet signature; subsequent ones reuse the session.
+- **Session keys**: Cached per-user per-package. First decrypt requires wallet signature; subsequent ones reuse the session (10 min TTL).
+- **Dynamic server matching**: When decrypting, parse `EncryptedObject` BCS to extract the server IDs used during encryption, then create a matched `SealClient` for reliability.
+
+### Walrus Storage
+
+- **Upload relay**: Use `https://upload-relay.testnet.walrus.space` with a tip of 1000 MIST per upload for reliable uploads (bypasses unreliable direct storage node connections).
+- **Aggregator-first download**: Fetch from `https://aggregator.walrus-testnet.walrus.space/v1/blobs/{blobId}` first (fast HTTP), fall back to SDK `readBlob()`.
+- **Lazy init**: `WalrusClient` loads WASM — must not initialize during SSR. Use lazy `ensureClient()` pattern.
+- **Flow API timing**: After the registration transaction, wait ~5 seconds for network sync before uploading slivers.
 
 ### Architecture Decisions
 
@@ -412,6 +476,7 @@ These were discovered during smart contract implementation. Keep adding to this 
 - **Content keyed by `u64` index**: `profile.content_count` used as auto-incrementing key for DOF. Simple but means content cannot be deleted/reordered without gaps.
 - **AccessPass stores `supporter: address`**: Used by `seal_approve` to verify the caller owns the pass. Important for SEAL validation.
 - **VERSION bumped to 2**: All structs (Platform, CreatorProfile, Registry) and entry functions check `version == VERSION`.
+- **Service layer uses `SuiJsonRpcClient`**: Services accept `SuiJsonRpcClient` (from dapp-kit's `useSuiClient()`) which provides both full JSON-RPC methods and core client compatibility for SEAL/Walrus.
 
 ---
 
@@ -423,7 +488,7 @@ For frontend developers building PTBs.
 
 ```
 suipatron::suipatron::create_profile(
-    platform: &mut Platform,        // shared object — VITE_PLATFORM_ID
+    platform: &mut Platform,        // shared object — platformId
     name: String,
     bio: String,
     tier_name: String,              // Initial tier name
@@ -625,15 +690,9 @@ See `CLAUDE.md` for full environment variable reference. Quick start:
 # 1. Build and test contracts
 cd packages/blockchain/contracts && sui move build && sui move test
 
-# 2. Deploy to testnet (when ready)
-cd packages/blockchain/contracts && sui client publish --gas-budget 200000000
-
-# 3. Record Package ID, Platform ID, and Registry ID from publish output
-
-# 4. Set up frontend (monorepo)
+# 2. Start the dapp (monorepo)
 pnpm install
-cd apps/suipatron && pnpm dev
-# Or from root: pnpm dev
+pnpm dev
 # Copy .env.example to apps/suipatron, fill in NEXT_PUBLIC_PACKAGE_ID, NEXT_PUBLIC_PLATFORM_ID, etc.
 ```
 
@@ -652,4 +711,4 @@ cd apps/suipatron && pnpm dev
 
 ---
 
-*Last updated: One-Time Tips & Platform Fees service layer added on branch `zoltan/phase-2`. IndexedTip type, both stores (in-memory + Supabase), indexer TipReceived event persistence, tips service (getTipsByProfile, getTipsByTipper), platform service (getPlatformConfig — on-chain reads), API routes (GET /api/creator/:id/tips, GET /api/platform), admin PTB builders (buildSetPlatformFeeTx, buildWithdrawPlatformFeesTx), Supabase migration (indexer_tips table). Previous: Subscription Tiers frontend, Creator Registry service layer, Phase 2 tier support, smart contracts (45/45 tests). Needs testnet deployment. SEAL, Walrus, and SuiNS integrations remain.*
+*Last updated: Merged main branch into zoltan/phase-2. All Phase 2 service layer features complete (tiers, subscriptions, registry, tips/fees). Smart contracts deployed to testnet. UI pages implemented with on-chain query hooks and Walrus integration. SEAL and SuiNS integrations remain.*

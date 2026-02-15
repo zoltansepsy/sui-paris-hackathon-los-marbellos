@@ -8,6 +8,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import { useCurrentAccount, useDisconnectWallet } from "@mysten/dapp-kit";
 import type { User } from "@/shared/types/user.types";
 import { EnokiFlowProvider, useEnokiFlow } from "@mysten/enoki/react";
 import {
@@ -18,6 +19,7 @@ import {
 
 interface AuthContextType {
   user: User | null;
+  walletAddress: string | null;
   isLoading: boolean;
   signIn: (emailOrRedirect?: string) => Promise<void>;
   signOut: () => void;
@@ -32,8 +34,12 @@ type StorageAdapter = {
   removeItem: (k: string) => void;
 };
 
+function truncateAddress(address: string): string {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
 function userFromAddress(address: string): User {
-  const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const short = truncateAddress(address);
   return {
     id: address,
     name: short,
@@ -47,6 +53,8 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
   const enoki = useEnokiFlow();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const currentAccount = useCurrentAccount();
+  const walletAddress = currentAccount?.address ?? null;
 
   useEffect(() => {
     const syncUser = (state: { address?: string }) => {
@@ -86,7 +94,7 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, signIn, signOut, updateUser }}
+      value={{ user, walletAddress, isLoading, signIn, signOut, updateUser }}
     >
       {children}
     </AuthContext.Provider>
@@ -94,9 +102,26 @@ function EnokiAuthProviderInner({ children }: { children: React.ReactNode }) {
 }
 
 function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [mockUser, setMockUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const storageRef = useRef<StorageAdapter | null>(null);
+
+  const currentAccount = useCurrentAccount();
+  const { mutate: disconnectWallet } = useDisconnectWallet();
+
+  const walletAddress = currentAccount?.address ?? null;
+
+  // Derive user from wallet or mock
+  const user: User | null = walletAddress
+    ? {
+        name: truncateAddress(walletAddress),
+        email: "",
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${walletAddress}`,
+        isCreator: false,
+        ...mockUser, // preserve any updateUser overrides
+        id: walletAddress, // always use wallet address as id
+      }
+    : mockUser;
 
   useEffect(() => {
     import("./storage").then(({ getAuthStorage }) => {
@@ -104,7 +129,7 @@ function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
       const stored = storageRef.current.getItem("suipatron_user");
       if (stored) {
         try {
-          setUser(JSON.parse(stored));
+          setMockUser(JSON.parse(stored));
         } catch {
           /* ignore */
         }
@@ -113,17 +138,19 @@ function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const signIn = async (email: string) => {
+  // Mock sign-in for dev (when no wallet connected)
+  const signIn = async (email?: string) => {
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 1000));
     const newUser: User = {
       id: `user_${Date.now()}`,
-      name: email.split("@")[0],
-      email,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+      name: (email || "demo@example.com").split("@")[0],
+      email: email || "demo@example.com",
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email || "demo"}`,
       isCreator: false,
     };
-    setUser(newUser);
+
+    setMockUser(newUser);
     const storage =
       storageRef.current ?? (await import("./storage")).getAuthStorage();
     storage.setItem("suipatron_user", JSON.stringify(newUser));
@@ -131,26 +158,23 @@ function MockAuthProviderInner({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = () => {
-    setUser(null);
+    if (walletAddress) {
+      disconnectWallet();
+    }
+    setMockUser(null);
     storageRef.current?.removeItem("suipatron_user");
   };
 
   const updateUser = (updates: Partial<User>) => {
     if (!user) return;
-    const updated = { ...user, ...updates };
-    setUser(updated);
-    storageRef.current?.setItem("suipatron_user", JSON.stringify(updated));
+    const updatedUser = { ...mockUser, ...updates };
+    setMockUser(updatedUser as User);
+    storageRef.current?.setItem("suipatron_user", JSON.stringify(updatedUser));
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        signIn: (e) => signIn(typeof e === "string" ? e : "demo@example.com"),
-        signOut,
-        updateUser,
-      }}
+      value={{ user, walletAddress, isLoading, signIn, signOut, updateUser }}
     >
       {children}
     </AuthContext.Provider>
