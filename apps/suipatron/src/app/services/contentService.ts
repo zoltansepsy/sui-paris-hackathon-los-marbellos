@@ -7,7 +7,6 @@
 
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import type { SessionKey } from "@mysten/seal";
-import type { Signer } from "@mysten/sui/cryptography";
 import type { Transaction } from "@mysten/sui/transactions";
 import type { ContentUploadParams } from "../types/onchain";
 import { SealService, createSealService } from "./sealService";
@@ -188,11 +187,14 @@ export class ContentService {
    */
   async uploadAvatar(
     file: File,
-    signer: Signer,
-    ownerAddress?: string,
+    signAndExecute: (tx: {
+      transaction: any;
+      options?: Record<string, unknown>;
+    }) => Promise<{ digest: string }>,
+    ownerAddress: string,
   ): Promise<string> {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    return this.walrusService.uploadPublicFile(bytes, signer, ownerAddress);
+    return this.walrusService.uploadPublicFile(bytes, signAndExecute, ownerAddress);
   }
 
   /**

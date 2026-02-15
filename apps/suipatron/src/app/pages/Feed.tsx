@@ -26,6 +26,35 @@ export function Feed() {
     walletAddress ?? undefined,
   );
 
+  // Get unique creator profile IDs from access passes
+  const supportedCreatorIds = onchainPasses
+    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
+    : [];
+
+  // Fetch the actual creator profiles for supported creators
+  const {
+    data: onchainCreatorProfiles,
+    isLoading: creatorsLoading,
+  } = useCreatorProfilesByIds(
+    supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
+  );
+
+  // Fetch all creators to find the most supported one (for empty state)
+  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } = useCreatorProfiles();
+
+  // Find the most supported creator
+  const mostSupportedCreator = allCreatorProfiles
+    ? allCreatorProfiles.reduce((max, current) =>
+        current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
+        allCreatorProfiles[0]
+      )
+    : null;
+
+  // Fetch content for the most supported creator (for empty state)
+  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } = useContentList(
+    mostSupportedCreator?.objectId
+  );
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -51,39 +80,10 @@ export function Feed() {
     );
   }
 
-  // Get unique creator profile IDs from access passes
-  const supportedCreatorIds = onchainPasses
-    ? [...new Set(onchainPasses.map((p) => p.creatorProfileId))]
-    : [];
-
-  // Fetch the actual creator profiles for supported creators
-  const {
-    data: onchainCreatorProfiles,
-    isLoading: creatorsLoading,
-  } = useCreatorProfilesByIds(
-    supportedCreatorIds.length > 0 ? supportedCreatorIds : undefined,
-  );
-
   // Convert on-chain profiles to UI Creator type
   const supportedCreators: Creator[] = onchainCreatorProfiles
     ? onchainCreatorProfiles.map(creatorProfileToCreator)
     : [];
-
-  // Fetch all creators to find the most supported one (for empty state)
-  const { data: allCreatorProfiles, isLoading: allCreatorsLoading } = useCreatorProfiles();
-
-  // Find the most supported creator
-  const mostSupportedCreator = allCreatorProfiles
-    ? allCreatorProfiles.reduce((max, current) =>
-        current.totalSupporters > (max?.totalSupporters ?? 0) ? current : max,
-        allCreatorProfiles[0]
-      )
-    : null;
-
-  // Fetch content for the most supported creator (for empty state)
-  const { data: mostSupportedContent, isLoading: mostSupportedContentLoading } = useContentList(
-    mostSupportedCreator?.objectId
-  );
 
   // For now, use supportedCreatorIds to show creator links
   const feedContent: (Content & { creator: Creator })[] = [];

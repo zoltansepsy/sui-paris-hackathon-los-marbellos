@@ -219,7 +219,7 @@ export function NFTLabCard() {
             <ul className="list-disc list-inside mt-1 space-y-0.5 ml-2">
               <li>Mint a new NFT with this design</li>
               <li>Store image on Walrus and metadata on-chain</li>
-              <li>Transfer the NFT to the supporter's wallet</li>
+              <li>Transfer the NFT to the supporter&apos;s wallet</li>
               <li>Grant content access via AccessPass logic</li>
             </ul>
           </div>
