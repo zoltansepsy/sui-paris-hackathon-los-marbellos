@@ -19,7 +19,10 @@
       "Bash(pnpm ls:*)",
       "Bash(npm view:*)",
       "Bash(npm pack:*)",
-      "Bash(pnpm update:*)"
+      "Bash(pnpm update:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(npx vercel inspect:*)",
+      "Bash(pnpm install:*)"
     ]
   }
 }
