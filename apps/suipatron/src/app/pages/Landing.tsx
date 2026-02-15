@@ -13,7 +13,7 @@ import {
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Shield, Zap, Globe, Users, CheckCircle2, Heart } from "lucide-react";
+import { Shield, Zap, Globe, CheckCircle2, Heart } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function Landing() {
@@ -45,7 +45,7 @@ export function Landing() {
     try {
       await signIn(email);
       toast.success("Successfully signed in!");
-    } catch (error) {
+    } catch {
       toast.error("Sign in failed. Please try again.");
     } finally {
       setIsLoading(false);

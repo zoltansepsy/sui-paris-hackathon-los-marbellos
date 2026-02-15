@@ -9,7 +9,6 @@
 
 import { WalrusClient } from "@mysten/walrus";
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import type { Signer } from "@mysten/sui/cryptography";
 import {
   WALRUS_AGGREGATOR_URL_TESTNET,
   WALRUS_UPLOAD_RELAY_TESTNET,

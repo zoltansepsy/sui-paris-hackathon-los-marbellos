@@ -161,7 +161,7 @@ export function Feed() {
                       <ContentCard
                         content={content}
                         isLocked={true}
-                        blobId={(content as any).blobId}
+                        blobId={"blobId" in content ? content.blobId : undefined}
                       />
                     </Link>
                   ))}

@@ -8,7 +8,9 @@
       "WebFetch(domain:gateway.walrus.space)",
       "Bash(xargs:*)",
       "Bash(ls:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

@@ -32,7 +32,7 @@ function getPackageId(): string {
   return id;
 }
 
-function getRpcUrl(): string {
+function _getRpcUrl(): string {
   const network =
     process.env.NEXT_PUBLIC_SUI_NETWORK ??
     process.env.VITE_SUI_NETWORK ??
